@@ -34,7 +34,6 @@ class VolumeView():
 
         # Init phase
         self.build_actor()
-        self.set_color_map()
         
         #msg = 'Volume abs center', self.volume_center, 'position', np.array(self.volume_actor.pos())
         #logging.info(msg)

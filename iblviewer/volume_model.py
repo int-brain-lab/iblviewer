@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Mapping, List, Any
-import datetime
+from datetime import datetime
 import numpy as np
 import os
 import logging
@@ -31,7 +31,7 @@ class VolumeModel:
     dimensions: np.ndarray = np.zeros(3).astype(np.float64)
     center: np.ndarray = np.zeros(3).astype(np.float64)
 
-    def is_segmentated_volume(self):
+    def is_segmented_volume(self):
         """
         Get whether current volume is segmented or rather a weighted diffusion imaging
         """
@@ -67,7 +67,7 @@ class VolumeModel:
 
         time = datetime.now()
 
-        mod_file_path = utils.change_file_name(file_path, None, None, NORMALIZED_VOLUME_SUFFIX)
+        mod_file_path = utils.change_file_name(file_path, None, None, VolumeModel.NORMALIZED_VOLUME_SUFFIX)
         volume = None
         if os.path.exists(mod_file_path):
             volume = self.import_volume(mod_file_path)
@@ -90,6 +90,9 @@ class VolumeModel:
     def reassign_scalars(self, volume, df_column_map, write_path=None):
         """
         Reassign scalar values to something that makes more sense.
+        There are two issues we fix here:
+
+        # 1 Weird scalar value range
         Scalar values in original annotation_xxx.nrrd (where xxx is the resolution) are
         not set in a clever way. Brain atlas regions (over a thousand) feature indices from 0 to
         ... 607344834! Applying a transfer function interactively where most values are useless 
@@ -97,6 +100,11 @@ class VolumeModel:
         So we rewrite Allen Atlas region ids to row ids (from 0 to 1000+) because these should
         have been the actual unique ids. This is stored to disk so that we don't recompute
         this all the time.
+
+        # 2 Hemisphere symmetry
+        All regions are labelled with the same labels on both hemispheres, which is a problem
+        if we want to assign different values to, say, the left hippocampus CA1 vs right hippo CA1.
+        
         :param volume: Volume ndarray
         :param write_path: Where the modified volume will be stored (to spare going through this method next time)
         :param df_column_map: Pandas DataFrame column that maps to the scalars for each unique label of the segmented volume. 

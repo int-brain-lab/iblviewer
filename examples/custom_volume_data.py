@@ -110,10 +110,11 @@ def load_priors_in_viewer(controller, nan_color=[0.0, 0.0, 0.0], nan_alpha=1.0, 
 
 
 if __name__ == '__main__':
+    
     resolution = 25 # units = um
-    mapping = 'Allen'
+    mapping = 'Beryl'
     controller = atlas_controller.AtlasController()
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 
-    load_priors_in_viewer(controller, nan_color=[0.75, 0.75, 0.75], nan_alpha=0.5, fake_time_series_steps=100)
+    load_priors_in_viewer(controller, nan_color=[0.75, 0.75, 0.75], nan_alpha=0.15, fake_time_series_steps=10)
     controller.render()

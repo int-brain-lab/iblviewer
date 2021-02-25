@@ -10,6 +10,7 @@ import pandas as pd
 import pickle
 
 import vtk
+import vedo
 from vedo import *
 from vedo.addons import *
 import ibllib.atlas as atlas
@@ -23,7 +24,6 @@ import iblviewer.utils as utils
 class AtlasView():
     
     BASE_PATH = utils.split_path(os.path.realpath(__file__))[0]
-    SLICE_MESH_SUFFIX = 'Slice'
 
     def __init__(self, plot, model):
         """
@@ -77,87 +77,144 @@ class AtlasView():
         settings.multiSamples = 0
         #print('Renderer size', renderer.GetSize())
 
-    def add_lines(self, start_points, end_points=None, spherical_angles=None, radians=True, values=None, use_origin=True, relative=False, add_to_scene=True):
+    def new_segments(self, start_points, end_points=None, line_width=2, spherical_angles=None, radians=True, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
         Add a set of lines with given end points
         :param start_points: 3D numpy array of points of length n
         :param end_points: 3D numpy array of points of length n
+        :param line_width: Line width, defaults to 2px
         :param spherical_angles: 3D numpy array of spherical angle data of length n 
         In case end_points is None, this replaces end_points by finding the relative
         coordinate to each start point with the given radius/depth, theta and phi
         :param values: 1D list of length n, for one scalar value per line
         :param radians: Whether the given spherical angle data is in radians or in degrees
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
-        :param relative: Whether the given end point is relative to the start point. False by default,
+        :param relative_end_points: Whether the given end point is relative to the start point. False by default,
         except is spherical coordinates are given
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :return: Lines
         """
-        #points = df[['x', 'y', 'z']].to_numpy()
-        #angles = df[['depth', 'theta', 'phi']].to_numpy()
-        #probes_data = df[['x', 'y', 'z', 'depth', 'theta', 'phi']].to_numpy()
         if len(start_points) != len(end_points):
             logging.error('Mismatch between start and end points length. Fix your data and call add_lines() again.')
             return
-
-        if use_origin:
-            start_points = -1 * start_points + self.model.origin
-
-        if values is None:
-            values = np.arange(len(start_points))
-            
-        if end_points is None:
+        
+        if end_points is None and spherical_angles is not None:
             relative = True
             if radians:
                 end_points = spherical_angles.apply(spher2cart)
             else:
                 end_points = spherical_angles.apply(utils.spherical_degree_angles_to_xyz)
+        elif end_points is None:
+            # We assume start_points are segments
+            start_points = start_points[:, 0]
+            end_points = start_points[:, 1]
         
-        if relative:
+        if relative_end_points:
             end_points += start_points
-
-        distances = np.linalg.norm(end_points - start_points)
+        
+        #distances = np.linalg.norm(end_points - start_points)
         # Lines is a single object. It's the same principle as grouping particles into one object
-        lines = Lines(start_points, end_points).lw(1).cmap('Accent', distances, on='cells')
+        lines = Lines(start_points, end_points)#.cmap('Accent', distances, on='cells')
         #lines.addCellArray(values, 'scalars')
-        lines.name = 'probes'
+        lines.lw(line_width)
+        lines.lighting(0)
+        lines.pickable(True)
+        lines.name = AtlasModel.LINES_PREFIX
         if add_to_scene:
             self.plot.add(lines)
         return lines
 
-    def add_points(self, positions, values, radii=5, color_map='viridis', name='neurons', use_origin_as_offset=True, noise_amount=0, add_to_scene=True, as_spheres=True):
+    def new_lines(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
-        Add points to the View
+        Create a set of lines with given point sets
+        :param point_sets: List of lists of 3D coordinates
+        :param line_width: Line width, defaults to 2px
+        :param spherical_angles: 3D numpy array of spherical angle data of length n 
+        In case end_points is None, this replaces end_points by finding the relative
+        coordinate to each start point with the given radius/depth, theta and phi
+        :param values: 1D list of length n, for one scalar value per line
+        :param radians: Whether the given spherical angle data is in radians or in degrees
+        :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
+        :param relative_end_points: Whether the given end point is relative to the start point. False by default,
+        except is spherical coordinates are given
+        :param add_to_scene: Whether the new lines are added to scene/plot and rendered
+        :return: Lines
+        """
+        target =  list(point_sets.keys()) if isinstance(point_sets, dict) else range(len(point_sets))
+        points_lists = []
+        indices = []
+        line_id = 0
+        for index in target:
+            point_set = point_sets[index]
+            point_set = np.array(point_set).astype(np.float)
+            if use_origin:
+                point_set = point_set * [[1, -1, -1]] + self.model.origin
+            points_lists.append(point_set)
+            indices.append(line_id)
+            line_id += 1
+
+        if values is None:
+            values = np.arange(len(point_sets))
+
+        #distances = np.linalg.norm(end_points - start_points)
+        # Lines is a single object. It's the same principle as grouping particles into one object
+        lines = utils.LinesExt(points_lists).cmap('Accent', indices, on='cells')
+        lines.addCellArray(values, 'ids')
+        lines.lighting(0)
+        lines.pickable(True)
+        lines.lw(line_width)
+        lines.name = AtlasModel.LINES_PREFIX
+        if add_to_scene:
+            self.plot.add(lines)
+        return lines
+
+    def new_points(self, positions, radius=10, values=None, color_map='viridis', use_origin=True, noise_amount=0, as_spheres=True, add_to_scene=False):
+        """
+        Create new points as circles or spheres
         :param positions: 3D array of coordinates
-        :param values: 1D array of values, one per neuron
-        :param radii: List same length as positions of radii. The default size is 5um, or 5 pixels
+        :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
         in case as_spheres is False.
+        :param values: 1D array of values, one per neuron or a time series
         :param color_map: A color map, can be a color map built with model.build_color_map(), 
         a color map name (see vedo documentation), a list of values, etc.
         :param name: All point neurons are grouped into one object, you can give it a custom name
-        :parma use_origin_as_offset: Whether the origin is added as offset to the given positions
+        :parma use_origin: Whether the origin is added as offset to the given positions
         :param noise_amount: Amount of 3D random noise applied to each point. Defaults to 0
-        :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param as_spheres: Whether the points are spheres, which means their size is relative to 
         the 3D scene (they will get bigger if you move the camera closer to them). On the other hand,
         if points are rendered as points, their radius in pixels will be constant, however close or
         far you are from them (which can lead to unwanted visual results)
+        :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :return: Either Points or Spheres, depending on as_sphere param
         """
-        if isinstance(radii, int) or isinstance(radii, float):
-            radii = [radii] * len(positions)
-
-        if use_origin_as_offset:
-            positions += self.model.origin
+        if use_origin:
+            positions = positions * [[1, -1, -1]] + self.model.origin
         if noise_amount > 0:
             positions += np.random.rand(len(positions), 3) * noise_amount
 
+
+        if values is not None:
+            if isinstance(values, np.ndarray) and values.shape[1] > 1:
+                # handle case where we want a time series
+                # temporary default
+                values = np.array(values[:, 0]) # TODO: change this and handle time series
+                min_value = min(values)
+                max_value = max(values)
+                colors = []
+                for value in values:
+                    colors.append(list(vedo.colorMap(value, color_map, min_value, max_value)))
+
         if as_spheres:
-            points = Spheres(positions, r=radii)
+            if isinstance(radius, int) or isinstance(radius, float):
+                radii = [radius] * len(positions)
+            points = utils.SpheresExt(positions, r=radius, c=colors)
         else:
             points = Points(positions, r=radii)
-        points.lighting(0).pickable(True).cmap(color_map, values, on='cells')
-        points.name = name
+            points.cmap(color_map, values, on='points')
+        points.lighting('off')
+        points.pickable(True)
+        #points.color([0.5, 0.5, 0.5])
+        points.name = AtlasModel.POINTS_PREFIX
         if add_to_scene:
             self.plot.add(points)
         return points

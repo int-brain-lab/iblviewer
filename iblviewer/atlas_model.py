@@ -80,6 +80,8 @@ class AtlasModel:
     # And for some reason, it's not exactly in the middle of X axis (should be 5400.0)...
     IBL_BREGMA_ORIGIN = ibllib.atlas.ALLEN_CCF_LANDMARKS_MLAPDV_UM['bregma']
     ALLEN_ATLAS_RESOLUTIONS = [10, 25, 50, 100]
+    LINES_PREFIX = '[Lines]'
+    POINTS_PREFIX = '[Points]'
 
     runtime: datetime = datetime.now()
     # State vars
@@ -167,6 +169,16 @@ class AtlasModel:
             return
         storage_property[model.name] = model
 
+    def remap(self, ids, source='Allen', dest='Beryl'):
+        """
+        Remap ids/scalar values from source to destination
+        Function by Olivier Winter
+        """
+        #from ibllib.atlas import BrainRegions as br
+        from brainbox.numerical import ismember
+        _, inds = ismember(ids, self.atlas.regions.mappings[source])
+        return self.atlas.regions.mappings[dest][inds]
+
     def initialize(self, resolution=None):
         """
         Get Allen Atlas metadata from their CSV file embed in IBL module
@@ -190,14 +202,11 @@ class AtlasModel:
         self.camera = self.add_model('Camera', self.cameras, CameraModel)
         self.ui = AtlasUIModel()
 
-    def load_volume(self, mapping=None):
+    def get_name(self, *args):
         """
-        Load the volume to visualize
-        :param mapping: Mapping, optional. This will process the volume and reassign values depending
-        on the chosen mapping.
+        Get full name for a model, separated by underscores
         """
-        self.volume.mapping = mapping
-        self.set_allen_segmented_volume(self.volume.mapping)
+        return '_'.join(args)
 
     def initialize_slicers(self):
         """
@@ -208,6 +217,7 @@ class AtlasModel:
 
         default_name = 'Atlas'
         pn = SlicerModel.NAME_XYZ_POSITIVE
+        prefix = SlicerModel.NAME_PREFIX
         x_slicer = self.add_model(SlicerModel.NAME_PREFIX + pn[0], self.slicers, SlicerModel)
         x_slicer.set_axis(0)
         y_slicer = self.add_model(SlicerModel.NAME_PREFIX + pn[1], self.slicers, SlicerModel)
@@ -230,7 +240,19 @@ class AtlasModel:
         n_slicer.flip_normal()
         #self.store_model(self.transfer_function, self.transfer_functions)
 
-    def set_allen_segmented_volume(self, volume_data, atlas_mapping=None):
+    def load_allen_volume(self, mapping=None, mode=None):
+        """
+        Load the volume to visualize
+        :param mapping: Mapping, optional. This will process the volume and reassign values depending
+        on the chosen mapping.
+        """
+        self.volume.mapping = mapping
+        if mode == 0 or mode == 'dwi':
+            self.set_allen_dwi_volume()
+        else:
+            self.set_allen_segmented_volume(self.volume.mapping)
+
+    def set_allen_segmented_volume(self, atlas_mapping=None):
         """
         Set the segmented (labelled) volume, aka taxonomy, with the given mapping
         :param atlas_mapping: Mapping, either a string for the name of the mapping or an integer. 
@@ -361,7 +383,7 @@ class AtlasModel:
             alpha.append([r_id, 0.0 if r_id <= 0 else 1.0])
         rgb = np.array(rgb, dtype=object)
         alpha = np.array(alpha)
-        
+
         model.set_data(scalar_map, rgb, alpha)
 
         if make_active:

@@ -29,6 +29,21 @@ class SlicerView():
         self.actor = None
         self.interactor = None
 
+    def apply_lut(self, lut=None, actor=None):
+        """
+        Apply transfer function with a look-up table
+        :param lut: vtkLookupTable
+        :param actor: The actor to receive this
+        """
+        if (actor is None and self.actor is None):
+            return
+        actor = self.actor if actor is None else actor
+        actor._mapper.SetLookupTable(lut)
+
+        # cmap works for the volume but not for the slice so we build 
+        # our own lut beforehand and use it as above
+        #self.actor.cmap(tf.color_map, alpha=tf.opacity_map)
+
     def reslice(self, volume, origin, normal):
         """
         Slice a volume with a plane oriented by the given normal.
@@ -130,9 +145,10 @@ class SlicerView():
             new_slice = volume_actor.ySlice(in_volume_slice)
         return new_slice
 
-    def update(self, value=None, normal=None, axis=None, clipping_planes=None):
+    def update(self, value=None, normal=None, axis=None, clipping_planes=None, add_to_scene=True):
         """
         Update slicer
+        :param add_to_scene: Whether the slice is added to scene
         """
         value = self.model.value if value is None else value
         normal = self.model.normal if normal is None else normal
@@ -144,28 +160,14 @@ class SlicerView():
         else:
             new_slice = self.slice_on_normal(value, normal)
 
-        self._update(new_slice, clipping_planes)
-
-    def apply_lut(self, lut=None, actor=None):
-        """
-        Apply transfer function with a look-up table
-        :param lut: vtkLookupTable
-        :param actor: The actor to receive this 
-        """
-        if (actor is None and self.actor is None):
-            return
-        actor = self.actor if actor is None else actor
-        actor._mapper.SetLookupTable(lut)
-
-        # cmap works for the volume but not for the slice so we build 
-        # our own lut beforehand and use it as above
-        #self.actor.cmap(tf.color_map, alpha=tf.opacity_map)
+        self._update(new_slice, clipping_planes, add_to_scene)
         
-    def _update(self, new_slice, clipping_planes=None):
+    def _update(self, new_slice, clipping_planes=None, add_to_scene=True):
         """
         Internal update method to refresh the plot with the new slice mesh
         :param new_slice: Mesh actor
         :param clipping_planes: A set of vtkClippingPlanes, optional
+        :param add_to_scene: Whether the slice is added to scene
         """
         if new_slice is None:
             return
@@ -194,7 +196,8 @@ class SlicerView():
 
         self.actor = new_slice
         self.apply_lut(self.atlas_model.transfer_function.lut)
-        self.plot.add([new_slice])
+        if add_to_scene:
+            self.plot.add([new_slice])
 
         """ 
         slice_center = new_slice.centerOfMass()
