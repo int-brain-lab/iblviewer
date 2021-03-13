@@ -26,7 +26,6 @@ conda activate iblenv
 ```
 Then:
 ```bash
-pip install git+https://github.com/int-brain-lab/ibllib.git@develop
 pip install git+https://github.com/marcomusy/vedo.git
 pip install git+https://github.com/int-brain-lab/iblviewer.git
 ```
