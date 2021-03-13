@@ -54,7 +54,7 @@ class AtlasController():
         self.selection_text = None
         self.selection_point = None
 
-    def initialize(self, resolution=25, mapping='Beryl', volume_mode=None, context=None, embed_ui=False, jupyter=False, plot=None, plot_window_id=0, num_windows=1,):
+    def initialize(self, resolution=25, mapping='Beryl-lr', volume_mode=None, context=None, embed_ui=False, jupyter=False, plot=None, plot_window_id=0, num_windows=1,):
         """
         Initialize the controller, main entry point to the viewer
         :param resolution: Resolution of the atlas volume.
@@ -424,7 +424,11 @@ class AtlasController():
             ptid = actor.closestPoint(event.picked3d, returnPointId=True)
             # Scalar values in volume are integers in this case
             value = int(actor.getPointArray()[ptid])
-            txt = 'Atlas ID: ' + str(self.model.metadata.id[value]) + ' - ' + str(self.model.metadata.name[value])
+
+            allen_id = self.model.atlas.regions.id[value]
+            region = self.model.atlas.regions.get(allen_id)
+            txt = f'Atlas ID: {allen_id} - {region.name[0]}'
+
             data_color = self.model.transfer_function.color_map[value, 1]
             scalar = self.model.transfer_function.scalar_map.get(value)
             if scalar is not None:

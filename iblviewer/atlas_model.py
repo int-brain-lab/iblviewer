@@ -75,9 +75,9 @@ class AtlasUIModel:
 
 @dataclass
 class AtlasModel:
-    # Default origin is "bregma", an origin defined at the center of the XY axes (not on Z)
+    # Default origin is "bregma", an origin defined at the center of the XY axes (not on Z)
     # For reference, bregma is np.array([5739.0, 5400.0, 332.0])
-    # And for some reason, it's not exactly in the middle of X axis (should be 5400.0)...
+    # And for some reason, it's not exactly in the middle of X axis (should be 5400.0)...
     IBL_BREGMA_ORIGIN = ibllib.atlas.ALLEN_CCF_LANDMARKS_MLAPDV_UM['bregma']
     ALLEN_ATLAS_RESOLUTIONS = [10, 25, 50, 100]
     LINES_PREFIX = '[Lines]'
@@ -100,8 +100,6 @@ class AtlasModel:
     origin: np.ndarray = IBL_BREGMA_ORIGIN
     # Atlas wrapper, in the case of IBL: ibllib.atlas.AllenAtlas
     atlas: Any = None
-    # Actual .csv file as pandas dataframe
-    metadata: pd.DataFrame = None
     atlas_mapping_ids: list = None
 
     cameras: dict = field(default_factory=dict)
@@ -115,7 +113,7 @@ class AtlasModel:
     settings: dict = field(default_factory=dict)
 
     def get_num_scalars(self):
-        return len(self.atlas.metadata)
+        return self.atlas.regions.id.size
 
     def find_model(self, substring, models):
         """
@@ -192,7 +190,6 @@ class AtlasModel:
         default_name = 'Atlas'
         self.atlas = ibllib.atlas.AllenAtlas(resolution)
         self.atlas_mapping_ids = list(self.atlas.regions.mappings.keys())
-        self.metadata = pd.read_csv(ibllib.atlas.regions.FILE_REGIONS)
 
         self.volume = self.get_model('Mouse atlas CCF v3', self.volumes, VolumeModel)
         self.volume.resolution = resolution
@@ -298,7 +295,7 @@ class AtlasModel:
             else:
                 map_id = atlas_mapping
 
-            # This mapping actually changes the order of the axes in the volume...
+            # This mapping actually changes the order of the axes in the volume...
             volume_data = self.atlas.regions.mappings[map_id][volume]
             # Undoing something wrong done in IBL back-end when reading the nrrd file or when applying the mapping
             volume_data = self.untranspose(volume_data)
@@ -313,24 +310,10 @@ class AtlasModel:
         :param acronym: Acronym of a brain region
         :return: Region id and row id
         """
-        region_data = self.metadata[self.metadata.acronym == acronym]
-        if region_data is None or len(region_data) < 1:
+        ind = np.where(self.atlas.regions.acronym == 'PRC')[0]
+        if ind.size < 1:
             return
-        return region_data.id.to_numpy()[0], region_data.index[0]
-
-    def get_atlas_region_color(self, region_row_id, not_found_color=[0.0, 0.0, 0.0]):
-        """
-        Get RGB color of a brain region from the Allen brain atlas
-        :param region_row_id: Atlas region row id
-        :param not_found_color: When no color data is found, use this default value
-        :return: 3D array (rgb)
-        """
-        # Note @Allen brain devs: when you store non uniform data, people down the line have to bear with it
-        not_always_hex_col = self.metadata.color_hex_triplet[region_row_id]
-        rgb = not_found_color
-        if isinstance(not_always_hex_col, str) and not_always_hex_col != '0':
-            rgb = colors.getColor('#' + str(not_always_hex_col))
-        return rgb
+        return self.atlas.regions.id[ind], ind
 
     def get_transfer_function_and_id(self, index):
         """
@@ -369,23 +352,21 @@ class AtlasModel:
         :return: TransferFunctionModel
         """
         model = self.add_model(model, self.transfer_functions, TransferFunctionModel)
-
+        nregions = self.atlas.regions.id.size
         scalar_map = {}
-        for r_id in range(len(self.metadata)):
-            scalar_map[r_id] = r_id
-        
+        for ir in range(nregions):
+            scalar_map[ir] = ir
+
         rgb = []
         alpha = []
         # Vedo works with nested lists with rows: [region_id, [r, g, b]] for color, and [region_id, a] for alpha
-        for r_id in range(len(self.metadata)):
-            rgb.append([r_id, self.get_atlas_region_color(r_id)])
+        for r_id in range(nregions):
+            rgb.append([r_id, colors.getColor(self.atlas.regions.rgb[r_id])])
             # First region in atlas is not a region (void) so we make it transparent
             alpha.append([r_id, 0.0 if r_id <= 0 else 1.0])
         rgb = np.array(rgb, dtype=object)
         alpha = np.array(alpha)
-
         model.set_data(scalar_map, rgb, alpha)
-
         if make_active:
             self.transfer_function = model
         return model

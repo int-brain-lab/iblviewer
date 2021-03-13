@@ -1,18 +1,11 @@
-
-# DEMO 2: add point neurons from conenctivity data
+# DEMO 2: add point neurons from connectivity data
 #from oneibl import one
-from oneibl.one import ONE
-import numpy as np
-from vedo import *
-from iblviewer import *
+from iblviewer import atlas_controller
 
 import os
 import numpy as np
-import pandas as pd
 import pickle
 
-import random
-import vedo
 
 '''
 # Invoke your own code with the lines below but you should wrap it in
@@ -68,7 +61,6 @@ def add_point_neurons(controller, data, with_labels=False):
         actors.append(labels)
     controller.plot.add(actors)
     return points
-
 
 
 if __name__ == '__main__':

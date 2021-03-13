@@ -178,7 +178,7 @@ class SlicerView():
         
         new_slice._mapper.SetScalarVisibility(1)
         # Without setting scalar range, the mapping will be off
-        new_slice._mapper.SetScalarRange(0, len(self.atlas_model.metadata))
+        new_slice._mapper.SetScalarRange(0, self.atlas_model.atlas.regions.id.size)
         new_slice._mapper.SetColorModeToMapScalars()
         new_slice._mapper.SetScalarModeToUsePointData()
         # As per a bug in VTK 9 that I found while using vedo that makes pickable fail when
