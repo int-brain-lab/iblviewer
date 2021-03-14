@@ -85,8 +85,8 @@ def add_insertion_probes(controller, one, reduced=True, with_labels=True):
 if __name__ == '__main__':
 
     one = ONE(base_url="https://alyx.internationalbrainlab.org")
-    resolution = 25 # units = um
-    mapping = 'Beryl-lr'
+    resolution = 25  # units = um
+    mapping = 'Allen-lr'
     controller = atlas_controller.AtlasController()
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 

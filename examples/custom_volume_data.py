@@ -111,8 +111,8 @@ def load_priors_in_viewer(controller, nan_color=[0.0, 0.0, 0.0], nan_alpha=1.0, 
 
 if __name__ == '__main__':
     
-    resolution = 25 # units = um
-    mapping = 'Beryl'
+    resolution = 25  # units = um
+    mapping = 'Allen-lr'
     controller = atlas_controller.AtlasController()
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 

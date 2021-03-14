@@ -310,7 +310,7 @@ class AtlasModel:
         :param acronym: Acronym of a brain region
         :return: Region id and row id
         """
-        ind = np.where(self.atlas.regions.acronym == 'PRC')[0]
+        ind = np.where(self.atlas.regions.acronym == acronym)[0]
         if ind.size < 1:
             return
         return self.atlas.regions.id[ind], ind
