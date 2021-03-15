@@ -269,7 +269,7 @@ class AtlasModel:
 
     def untranspose(self, volume):
         """
-        Procedure to reverse the (wrong) transposition from volume loaded with pynrrd by ibllib.atlas.AllenAtlas
+        Procedure to reverse the transposition from volume loaded with pynrrd by ibllib.atlas.AllenAtlas
         :param volume: Given volume
         """
         return np.transpose(volume, (2, 0, 1))
@@ -297,7 +297,7 @@ class AtlasModel:
 
             # This mapping actually changes the order of the axes in the volume...
             volume_data = self.atlas.regions.mappings[map_id][volume]
-            # Undoing something wrong done in IBL back-end when reading the nrrd file or when applying the mapping
+            # The IBL back-end uses a different convention for memory representation
             volume_data = self.untranspose(volume_data)
             logging.info('Loaded atlas volume with ' + map_id + ' mapping')
         else:
