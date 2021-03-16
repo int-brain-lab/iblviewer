@@ -54,7 +54,7 @@ class AtlasController():
         self.selection_text = None
         self.selection_point = None
 
-    def initialize(self, resolution=25, mapping='Beryl', volume_mode=None, context=None, embed_ui=False, jupyter=False, plot=None, plot_window_id=0, num_windows=1,):
+    def initialize(self, resolution=25, mapping='Beryl-lr', volume_mode=None, context=None, embed_ui=False, jupyter=False, plot=None, plot_window_id=0, num_windows=1,):
         """
         Initialize the controller, main entry point to the viewer
         :param resolution: Resolution of the atlas volume.
@@ -72,7 +72,7 @@ class AtlasController():
         logging.info('Starting IBL Viewer')
 
         settings.notebookBackend = jupyter
-        embedWindow(False) # or k3d, itk, panel or False
+        embedWindow(False)  # or k3d, itk, panel or False
         self.plot = Plotter(N=num_windows) if plot is None else plot
         self.plot_window_id = plot_window_id
 
@@ -103,7 +103,7 @@ class AtlasController():
         pzs_model = self.model.find_model(pn[2], self.model.slicers)
         self.pz_slicer = SlicerView(self.plot, self.volume_view, pzs_model, self.model)
         
-        # Negative slicers
+        # Negative slicers
         nxs_model = self.model.find_model(nn[0], self.model.slicers)
         self.nx_slicer = SlicerView(self.plot, self.volume_view, nxs_model, self.model)
         
@@ -424,7 +424,11 @@ class AtlasController():
             ptid = actor.closestPoint(event.picked3d, returnPointId=True)
             # Scalar values in volume are integers in this case
             value = int(actor.getPointArray()[ptid])
-            txt = 'Atlas ID: ' + str(self.model.metadata.id[value]) + ' - ' + str(self.model.metadata.name[value])
+
+            allen_id = self.model.atlas.regions.id[value]
+            region = self.model.atlas.regions.get(allen_id)
+            txt = f'Atlas ID: {allen_id} - {region.name[0]}'
+
             data_color = self.model.transfer_function.color_map[value, 1]
             scalar = self.model.transfer_function.scalar_map.get(value)
             if scalar is not None:
@@ -484,7 +488,7 @@ class AtlasController():
         btn_kw = self.model.ui.button_config
         tog_kw = self.model.ui.toggle_config
 
-        # LeftButtonReleaseEvent does not work. You have to use EndInteractionEvent instead (go figure...)
+        # LeftButtonReleaseEvent does not work. You have to use EndInteractionEvent instead (go figure...)
         # see https://stackoverflow.com/questions/52209534/vtk-mayavi-bug-all-buttonreleaseevents-fail-yet-all-buttonpressevents-wor
         self.add_callback('LeftButtonPressEvent', self.handle_left_mouse_press)
         self.add_callback('EndInteractionEvent', self.handle_left_mouse_release)
@@ -530,7 +534,7 @@ class AtlasController():
         """
         Update the UI
         """
-        # TODO: add more code to handle more cases
+        # TODO: add more code to handle more cases
         tfb = self.buttons.get('transfer_function')
         btn_kw = self.model.ui.button_config
         num_tfs = len(self.model.transfer_functions)

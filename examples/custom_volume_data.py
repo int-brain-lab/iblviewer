@@ -1,18 +1,19 @@
 # BASE CASE: load the viewer with desired options
-from vedo import *
-from iblviewer import *
+from iblviewer import atlas_controller
 
 import os
 import numpy as np
-import pandas as pd
 import pickle
 
 import random
 import vedo
+from pathlib import Path
+
+DEFAULT_PATH = Path(__file__).parent.joinpath("./data/completefits_2020-11-09.p")
 
 
-# Data given by Berk Gerçek, International Brain Laboratory
-def process_priors(controller, file_path='./examples/data/completefits_2020-11-09.p', randomize=None):
+# Data given by Berk Gerçek, International Brain Laboratory
+def process_priors(controller, file_path=DEFAULT_PATH, randomize=None):
     """
     Process priors data and get color map and scalar values
     """
@@ -108,11 +109,10 @@ def load_priors_in_viewer(controller, nan_color=[0.0, 0.0, 0.0], nan_alpha=1.0, 
         controller.add_transfer_function(scalar_map, rgb, alpha, make_current=False)
 
 
-
 if __name__ == '__main__':
     
-    resolution = 25 # units = um
-    mapping = 'Beryl'
+    resolution = 25  # units = um
+    mapping = 'Allen-lr'
     controller = atlas_controller.AtlasController()
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 

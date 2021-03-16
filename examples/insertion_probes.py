@@ -1,16 +1,8 @@
 # DEMO 1: add insertion probes data from IBL database (DataJoints)
 from oneibl.one import ONE
-import numpy as np
-from vedo import *
-from iblviewer import *
+from iblviewer import atlas_controller
 
-import os
 import numpy as np
-import pandas as pd
-import pickle
-
-import random
-import vedo
 
 
 def get_bwm_ins_alyx(one):
@@ -93,8 +85,8 @@ def add_insertion_probes(controller, one, reduced=True, with_labels=True):
 if __name__ == '__main__':
 
     one = ONE(base_url="https://alyx.internationalbrainlab.org")
-    resolution = 25 # units = um
-    mapping = 'Beryl'
+    resolution = 25  # units = um
+    mapping = 'Allen-lr'
     controller = atlas_controller.AtlasController()
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 

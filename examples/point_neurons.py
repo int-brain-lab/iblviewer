@@ -1,18 +1,12 @@
+# DEMO 2: add point neurons from connectivity data
+from pathlib import Path
 
-# DEMO 2: add point neurons from conenctivity data
-#from oneibl import one
-from oneibl.one import ONE
 import numpy as np
-from vedo import *
-from iblviewer import *
-
-import os
-import numpy as np
-import pandas as pd
 import pickle
 
-import random
-import vedo
+from iblviewer import atlas_controller
+
+EXAMPLE_FOLDER = Path(__file__).parent
 
 '''
 # Invoke your own code with the lines below but you should wrap it in
@@ -30,10 +24,10 @@ def add_point_neurons(controller, data, with_labels=False):
     All the columns after 'region' are be stored as a time series
     :param with_labels: Whether labels are added to the points
     """
-    if isinstance(data, str):
+    if isinstance(data, Path) or isinstance(data, str):
         pickles = []
         data_path = data
-        with (open(os.path.abspath(data_path), 'rb')) as openfile:
+        with (open(data_path, 'rb')) as openfile:
             while True:
                 try:
                     pickles.append(pickle.load(openfile))
@@ -70,19 +64,18 @@ def add_point_neurons(controller, data, with_labels=False):
     return points
 
 
-
 if __name__ == '__main__':
-
-    #one = ONE(base_url="https://alyx.internationalbrainlab.org")
-    resolution = 25 # units = um
-    mapping = 'Beryl'
+    resolution = 25  # units = um
+    mapping = 'Allen-lr'
     controller = atlas_controller.AtlasController()
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
-    
-    data = ['./examples/data/exp2_db4df448-e449-4a6f-a0e7-288711e7a75a_both', 
-    './examples/data/exp3_3dd347df-f14e-40d5-9ff2-9c49f84d2157_both', 
-    './examples/data/exp4_3c851386-e92d-4533-8d55-89a46f0e7384_both', 
-    './examples/data/exp5_158d5d35-a2ab-4a76-87b0-51048c5d5283_both']
+
+    data = [
+        './data/exp2_db4df448-e449-4a6f-a0e7-288711e7a75a_both',
+        './data/exp3_3dd347df-f14e-40d5-9ff2-9c49f84d2157_both',
+        './data/exp4_3c851386-e92d-4533-8d55-89a46f0e7384_both',
+        './data/exp5_158d5d35-a2ab-4a76-87b0-51048c5d5283_both']
+    data = [EXAMPLE_FOLDER.joinpath(d) for d in data]
     for data_set in data:
         add_point_neurons(controller, data_set)
     

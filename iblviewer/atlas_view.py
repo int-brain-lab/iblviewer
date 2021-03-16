@@ -105,15 +105,15 @@ class AtlasView():
             else:
                 end_points = spherical_angles.apply(utils.spherical_degree_angles_to_xyz)
         elif end_points is None:
-            # We assume start_points are segments
+            # We assume start_points are segments
             start_points = start_points[:, 0]
             end_points = start_points[:, 1]
         
         if relative_end_points:
             end_points += start_points
         
-        #distances = np.linalg.norm(end_points - start_points)
-        # Lines is a single object. It's the same principle as grouping particles into one object
+        # distances = np.linalg.norm(end_points - start_points)
+        # Lines is a single object. It's the same principle as grouping particles into one object
         lines = Lines(start_points, end_points)#.cmap('Accent', distances, on='cells')
         #lines.addCellArray(values, 'scalars')
         lines.lw(line_width)
@@ -156,8 +156,8 @@ class AtlasView():
         if values is None:
             values = np.arange(len(point_sets))
 
-        #distances = np.linalg.norm(end_points - start_points)
-        # Lines is a single object. It's the same principle as grouping particles into one object
+        # distances = np.linalg.norm(end_points - start_points)
+        # Lines is a single object. It's the same principle as grouping particles into one object
         lines = utils.LinesExt(points_lists).cmap('Accent', indices, on='cells')
         lines.addCellArray(values, 'ids')
         lines.lighting(0)

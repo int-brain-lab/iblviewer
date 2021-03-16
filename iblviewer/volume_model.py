@@ -19,12 +19,12 @@ class VolumeModel:
 
     name: str = '[Volume]'
     file_path: str = None
-    # In early 2021, either 'Beryl', a made-up name for grouping 
+    # In early 2021, either 'Beryl', a made-up name for grouping
     # some cortical layers and the default 'Atlas'. 
     # See ibllib.atlas.regions.mappings
     mapping_name: str = None
-    # Mapping function. If None, the volume will be given as it is.
-    mapping: Any = 'Allen'
+    # Mapping function. If None, the volume will be given as it is.
+    mapping: Any = 'Allen-lr'
     resolution: int = 25
     volume: np.ndarray = None
     volume_type: str = None

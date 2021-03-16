@@ -60,7 +60,7 @@ class TransferFunctionModel:
         lut.SetRange(0, num_values)
         lut.SetNumberOfTableValues(num_values)
 
-        # TODO: note that the alpha_map will work if it's not same length as rgb map. Only it has 
+        # TODO: note that the alpha_map will work if it's not same length as rgb map. Only it has
         # to be 2D (i.e. mapping n volume scalar values to n alpha values
         for iter_id in range(num_values):
             value, rgb = self.color_map[iter_id]
