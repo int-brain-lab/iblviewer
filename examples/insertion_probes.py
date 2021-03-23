@@ -1,7 +1,6 @@
 # DEMO 1: add insertion probes data from IBL database (DataJoints)
-from oneibl.one import ONE
 from iblviewer import atlas_controller
-
+import oneibl.one
 import numpy as np
 
 
@@ -58,15 +57,15 @@ def get_picks_mean_vectors(xyz_picks, extent=3):
     return np.array(vectors), ids
 
 
-def add_insertion_probes(controller, one, reduced=True, with_labels=True):
+def add_insertion_probes(controller, one_connection, reduced=True, with_labels=True):
     """
     Add insertion probe vectors
     :param controller: The IBLViewer controller
-    :param one: The "one" connection to IBL server
+    :param one_connection: The "one" connection to IBL server
     :param reduced: Whether insertion probes should be reduced to simple lines
     :param with_labels: Whether labels should be added to the lines
     """
-    vectors = get_bwm_ins_alyx(one)
+    vectors = get_bwm_ins_alyx(one_connection)
     if reduced:
         vectors, ids = get_picks_mean_vectors(vectors)
         lines = controller.view.new_segments(vectors)
@@ -84,11 +83,9 @@ def add_insertion_probes(controller, one, reduced=True, with_labels=True):
 
 if __name__ == '__main__':
 
-    one = ONE(base_url="https://alyx.internationalbrainlab.org")
-    resolution = 25  # units = um
-    mapping = 'Allen-lr'
+    one_connection = oneibl.one.ONE(base_url="https://alyx.internationalbrainlab.org")
     controller = atlas_controller.AtlasController()
-    controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
+    controller.initialize(resolution=25, mapping='Allen', embed_ui=True, jupyter=False)
 
-    add_insertion_probes(controller, one, False)
+    add_insertion_probes(controller, one_connection, reduced=False)
     controller.render()

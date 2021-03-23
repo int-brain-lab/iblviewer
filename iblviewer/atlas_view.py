@@ -11,8 +11,7 @@ import pickle
 
 import vtk
 import vedo
-from vedo import *
-from vedo.addons import *
+from vedo import settings
 import ibllib.atlas as atlas
 
 from iblviewer.atlas_model import AtlasModel
@@ -33,7 +32,7 @@ class AtlasView():
         """
         self.plot = plot
         self.model = model
-        self.volume_view = None
+        self.volume = None
 
         self.slicer_views = []
 
@@ -66,20 +65,21 @@ class AtlasView():
                 osprayNode.SetSamplesPerPixel(4,renderer)
                 osprayNode.SetAmbientSamples(4,renderer)
                 osprayNode.SetMaxFrames(4, renderer)
-                logging.info("Render info: using OSPRay.")
+                #logging.info("Render info: using OSPRay.")
             else:
-                logging.info("Render info: using OpenGL.")
+                #logging.info("Render info: using OpenGL.")
+                pass
         except (ImportError, NameError):
-            logging.info("Render info: VTK is not built with OSPRay support. Using OpenGL.")
+            #logging.info("Render info: VTK is not built with OSPRay support. Using OpenGL.")
+            pass
 
         settings.useDepthPeeling = True
         settings.useFXAA = True
         settings.multiSamples = 0
-        #print('Renderer size', renderer.GetSize())
 
-    def new_segments(self, start_points, end_points=None, line_width=2, spherical_angles=None, radians=True, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+    def add_segments(self, start_points, end_points=None, line_width=2, spherical_angles=None, radians=True, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
-        Add a set of lines with given end points
+        Add a set of segments
         :param start_points: 3D numpy array of points of length n
         :param end_points: 3D numpy array of points of length n
         :param line_width: Line width, defaults to 2px
@@ -93,28 +93,29 @@ class AtlasView():
         except is spherical coordinates are given
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :return: Lines
-        """
-        if len(start_points) != len(end_points):
-            logging.error('Mismatch between start and end points length. Fix your data and call add_lines() again.')
-            return
-        
+        """        
         if end_points is None and spherical_angles is not None:
-            relative = True
+            relative_end_points = True
+            spherical_angles = np.array(spherical_angles)
+            print('num spherical angles', len(spherical_angles))
             if radians:
-                end_points = spherical_angles.apply(spher2cart)
+                end_points = spherical_angles.apply(vedo.spher2cart)
             else:
                 end_points = spherical_angles.apply(utils.spherical_degree_angles_to_xyz)
         elif end_points is None:
-            # We assume start_points are segments
+            # We assume start_points are segments
             start_points = start_points[:, 0]
             end_points = start_points[:, 1]
+        elif end_points is not None and len(start_points) != len(end_points):
+            logging.error('Mismatch between start and end points length. Fix your data and call add_lines() again.')
+            return
         
         if relative_end_points:
             end_points += start_points
         
-        # distances = np.linalg.norm(end_points - start_points)
-        # Lines is a single object. It's the same principle as grouping particles into one object
-        lines = Lines(start_points, end_points)#.cmap('Accent', distances, on='cells')
+        #distances = np.linalg.norm(end_points - start_points)
+        # Lines is a single object. It's the same principle as grouping particles into one object
+        lines = vedo.Lines(start_points, end_points)#.cmap('Accent', distances, on='cells')
         #lines.addCellArray(values, 'scalars')
         lines.lw(line_width)
         lines.lighting(0)
@@ -156,8 +157,8 @@ class AtlasView():
         if values is None:
             values = np.arange(len(point_sets))
 
-        # distances = np.linalg.norm(end_points - start_points)
-        # Lines is a single object. It's the same principle as grouping particles into one object
+        #distances = np.linalg.norm(end_points - start_points)
+        # Lines is a single object. It's the same principle as grouping particles into one object
         lines = utils.LinesExt(points_lists).cmap('Accent', indices, on='cells')
         lines.addCellArray(values, 'ids')
         lines.lighting(0)
@@ -168,9 +169,9 @@ class AtlasView():
             self.plot.add(lines)
         return lines
 
-    def new_points(self, positions, radius=10, values=None, color_map='viridis', use_origin=True, noise_amount=0, as_spheres=True, add_to_scene=False):
+    def add_points(self, positions, radius=10, values=None, color_map='viridis', use_origin=True, noise_amount=0, as_spheres=True, add_to_scene=False):
         """
-        Create new points as circles or spheres
+        Add new points as circles or spheres
         :param positions: 3D array of coordinates
         :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
         in case as_spheres is False.
@@ -189,9 +190,8 @@ class AtlasView():
         """
         if use_origin:
             positions = positions * [[1, -1, -1]] + self.model.origin
-        if noise_amount > 0:
+        if noise_amount is not None:
             positions += np.random.rand(len(positions), 3) * noise_amount
-
 
         if values is not None:
             if isinstance(values, np.ndarray) and values.shape[1] > 1:
@@ -209,7 +209,7 @@ class AtlasView():
                 radii = [radius] * len(positions)
             points = utils.SpheresExt(positions, r=radius, c=colors)
         else:
-            points = Points(positions, r=radii)
+            points = vedo.Points(positions, r=radii)
             points.cmap(color_map, values, on='points')
         points.lighting('off')
         points.pickable(True)
@@ -219,18 +219,74 @@ class AtlasView():
             self.plot.add(points)
         return points
 
-    def update(self):
-        # if some 
-        pass
-        self.plot.show(self.plot.actors, at=0, interactive=False)
+    def add_point_cloud(self, positions, point_radius=2, auto_xy_rotate=True, add_to_scene=False):
+        """
+        Test method that validates that VTK is fast enough for displaying 10 million points interactively
+        """
+        if positions is None:
+            try:
+                points_path = utils.get_local_data_file_path('mouse_brain_neurons', extension='npz')
+                positions = np.load(points_path, allow_pickle=True)
+                positions = positions['arr_0']
+            except Exception:
+                # We sample a cube if you don't have the pickle file for neurons in the brain
+                positions = np.random.rand(1000000, 3) * 10000
+        values = np.random.rand(len(positions)) * 1.0
+        point_cloud = self.add_points(positions, point_radius, values, use_origin=False, as_spheres=False)
+        if auto_xy_rotate:
+            point_cloud.rotateX(90)
+            point_cloud.rotateZ(90)
+        if add_to_scene:
+            self.plot.add(point_cloud)
+        return point_cloud
+
+    def add_glyphs(self, positions):
+        raise NotImplementedError
+        # WIP
+        num_points = len(positions)
+        polydata = vtk.vtkPolyData()
+        points = vtk.vtkPoints()
+        points.SetNumberOfPoints(num_points)
+
+        cells = vtk.vtkCellArray()
+        scalars = vtk.vtkDoubleArray()
+        scalars.SetName('ScalarArray')
+
+        for p_id in range(num_points):
+            points.SetPoint(p_id, *positions[p_id])
+            cells.InsertNextCell(1)
+            cells.InsertCellPoint(p_id)
+        #points.InsertPoints(positions)
+
+        polydata.SetPoints(points)
+        polydata.SetVerts(cells)
+        polydata.GetPointData().SetScalars(scalars)
+        polydata.GetPointData().SetActiveScalars('ScalarArray')
+
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputData(polydata)
+        mapper.SetColorModeToDefault()
+        mapper.SetScalarRange(0, num_points)
+        mapper.SetScalarVisibility(1)
+
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+
+        return actor
+        '''
+        if glyph_actor is None:
+            glyph_actor = Ellipsoid()
+        #glyph = utils.SpheresExt(positions, r=10)
+        glyph = Glyph(positions, glyph_actor)
+        glyph.name = '[Glyph]'
+        glyph.lighting('off')
+        #glyph.cmap('viridis')#addScalarBar
+        '''
 
     def initialize(self):
         """
         Initialize the atlas viewer
         """
-        logging.info('\n\nStarting brain atlas View...\n')
-
-        # N is the number of windows/plots
         self.set_renderer()
         
         """
@@ -246,12 +302,3 @@ class AtlasView():
         #self.atlas_origin = Cross3D(self.model.origin, s=50, c='yellow').lighting(0)
         #self.atlas_origin_label = Text('Bregma origin', pos=self.atlas_origin.pos()+[.3,0,0], s=self.model.ui.font_scale*100, c='k').followCamera()
         #self.plot.add([self.atlas_origin])#, self.atlas_origin_label])
-
-
-    # -----------------------------------------------------------------
-    # WIP: use this as a utility
-    import trimesh
-    def ray_cast(self, origins, directions):
-        locations, index_ray, index_tri = mesh.ray.intersects_location(
-            ray_origins=origins, ray_directions=directions)
-    # -----------------------------------------------------------------

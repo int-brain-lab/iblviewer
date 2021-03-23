@@ -1,9 +1,9 @@
 import numpy as np
 import logging
+import os
 
 import vtk
-from vedo import *
-from vedo.addons import *
+import vedo
 
 import iblviewer.utils as utils
 
@@ -23,14 +23,13 @@ class VolumeView():
         self.atlas_model = atlas_model
 
         self.actor = None
+        self.surface_actor = None
+        self.sphere_actor = None
         self.alpha_factor = 0.001 #* self.model.volume.resolution
 
         self.clipping_planes = None
         self.clipping_axes = []
         self.scalar_bar = None
-        self.dummy_actor = Cross3D([0, 0, 0], s=0.0, c='black')
-        self.dummy_actor.pickable(0).lighting('off')
-        self.plot.add(self.dummy_actor, render=False)
 
         # Init phase
         self.build_actor()
@@ -43,11 +42,11 @@ class VolumeView():
         Set the volume actor for visualization in VTK
         """
         spacing = np.array([self.model.resolution]*3)
-        self.actor = Volume(self.model.volume, spacing=spacing, mapper='smart')
+        self.actor = vedo.Volume(self.model.volume, spacing=spacing, mapper='smart')
         self.actor.name = self.model.name
         self.actor.shade(False)
         self.actor.mode(0)
-        self.actor.pickable(False)
+        self.actor.pickable(1)
         # Apparently, setting a custom spacing results in a misaligned volume
         # by exactly half a voxel. This is fixed here.
         self.actor.pos(spacing / 2)
@@ -60,9 +59,11 @@ class VolumeView():
         self.bounding_planes = []
         self.init_bounding_planes()
         self.init_clipping_planes()
+        self.build_surface_mesh()
         self.plot.add(self.actor, render=False)
-
-
+        if self.surface_actor is not None:
+            self.plot.add(self.surface_actor, render=False)
+        
         #self.actor.alphaUnit(1)
         #self.actor.jittering(True)
         #self.actor._mapper.AutoAdjustSampleDistancesOn()
@@ -106,19 +107,19 @@ class VolumeView():
 
         if color_map is not None:
             self.actor.cmap(color_map)#['black', 'white'])
+            #self.surface_actor.cmap(color_map[:, 1])
         if alpha_map is not None:# and self.segmentation_mode():
             self.set_alpha_map(alpha_map)
-
-        #self.actor.addScalarBar(pos=(0.85,0.05), useAlpha=False)
-        #self.plot.add([self.actor.scalarbar]) #, self.dummy_actor.scalarbar])
+        
         self.plot.remove(self.scalar_bar)
         self.scalar_bar = utils.add_scalar_bar(tf.scalar_lut, pos=(0.8,0.05))
         self.plot.add([self.scalar_bar])
 
     def enable_shading(self):
+        """
+        See if this method is useful
+        """
         volumeProperty = self.actor.GetProperty()
-        #volumeProperty.SetColor(volumeColor)
-        #volumeProperty.SetScalarOpacity(volumeScalarOpacity)
         volumeProperty.SetInterpolationTypeToLinear()
         volumeProperty.ShadeOn()
         volumeProperty.SetAmbient(0.6)
@@ -138,12 +139,6 @@ class VolumeView():
         for axis in axes:
             p_plane = vtk.vtkPlane()
             n_plane = vtk.vtkPlane()
-            '''
-            normal = np.zeros(3).astype(float)
-            normal[axis] = 1.0
-            p_plane.SetNormal(normal)
-            n_plane.SetNormal(-normal)
-            '''
             self.clipping_planes.AddItem(p_plane)
             self.clipping_planes.AddItem(n_plane)
         self.clipping_axes = axes
@@ -204,65 +199,49 @@ class VolumeView():
         plane.SetOrigin(position)
         plane.SetNormal(normal)
 
-    def build_surface_mesh(self, region):
+    def isosurface(self, label):
+        if label is None:
+            # 0 is empty in segmented Allen volume
+            isosurface = self.actor.isosurface(1)
+        else:
+            isosurface = self.actor.threshold(label, label).isosurface(label)
+        isosurface.computeNormals()
+        isosurface.smoothWSinc().alpha(0.5)#.smoothLaplacian()
+        if label is not None:
+            isosurface.color(self.atlas_model.get_region_color(label))
+        return isosurface
+
+    def build_surface_mesh(self, region=None):
         """
         Build a surface mesh with marching cubes algorithm
         """
-        # TODO: export labeled regions as surfaces
-        isosurface = self.actor.threshold(region, region).isosurface(region)
-        isosurface.computeNormals().smoothLaplacian().alpha(0.2)
-        isosurface.color(self.atlas_model.get_region_color(region))
-        #self.current_region_surface
-        #for region_id in regions:
-            #isosurface, laplacian smooth and export
+        if not self.model.is_segmented_volume():
+            #logging.error('[VolumeView.build_surface_mesh()] cannot work without the segmented Allen volume')
+            return
+
+        self.surface_actor = utils.load_surface_mesh('997')
+        self.surface_actor.alpha(0)
+        self.surface_actor.name = self.model.name + '_surface'
+        self.surface_actor.mapper().SetClippingPlanes(self.clipping_planes)
+        self.surface_actor.pickable(0)
+        #self.surface_actor.ForceOpaqueOn()
+
+    def set_interactive_subsampling(self, on=False):
         """
-        import numpy as np
-        import vtk
-        from vtk.util.numpy_support import numpy_to_vtk
-
-        from .volume import numpy_to_volume
-        from .volume import volume_to_numpy
-
-        def _marching_cubes(label, index=None, normal=True, gradient=True, force_close=True):
+        Set volume subsampling on or off. 
+        This is enabled by default in VTK and we disable it by default in IBLViewer
+        :param on: Whether volume subsampling in interactive mode is on or off
         """
-
-        # Refactored code from yuta-hi/volume-renderer/pyvr/data/surface.py
-        '''
-        if not isinstance(label, np.ndarray):
-            label, spacing, origin = volume_to_numpy(label)
+        #self.plot.window.SetDesiredUpdateRate(0)
+        #self.actor._mapper.SetInteractiveUpdateRate(0)
+        self.model.interactive_subsampling = on
+        self.actor._mapper.SetAutoAdjustSampleDistances(on)
+        if on:
+            self.actor._mapper.InteractiveAdjustSampleDistancesOn()
         else:
-            spacing, origin = [1,1,1], [0,0,0]
+            self.actor._mapper.InteractiveAdjustSampleDistancesOff()
 
-        if force_close: # NOTE: make the closed surface
-            _pad_width = 10
-            label = np.pad(label, pad_width=_pad_width, mode='constant', constant_values=0)
-        else:
-            _pad_width = 0
-
-        origin -= _pad_width * np.array(spacing)
-        label = numpy_to_volume(label, spacing, origin)
-
-        surface = vtk.vtkDiscreteMarchingCubes()
-        surface.SetInputData(label)
-
-        if index is None:
-            n_label = int(label.GetScalarRange()[1]) + 1
-            surface.GenerateValues(n_label, 1, n_label)
-        else:
-            surface.GenerateValues(1, index, index)
-
-        surface.ComputeNormalsOn()
-        surface.ComputeGradientsOn()
-        surface.Update()
-
-        return surface.GetOutput()
-        '''
-
-    #def label_to_surface(self, volume, index=None, force_close=True):
-        #return _marching_cubes(label=volume, index=index, force_close=force_close)
-
-
-    # ------------------------------------------------------------------------- TEST CODE BELOW ONLY
+    # ----------------------- WIP for moving/rotating around a box that cut the volume
     '''
     def clip_volume(self, obj, event):
         obj.GetPlanes(self.clipping_planes)

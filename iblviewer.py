@@ -18,7 +18,7 @@ Copyright: 2021 Nicolas Antille, International Brain Laboratory
 License: MIT
 """
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __author__ = 'Nicolas Antille'
 __credits__ = 'International Brain Laboratory'
 

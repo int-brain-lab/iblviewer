@@ -37,7 +37,11 @@ class CameraModel:
 
     focal_point: np.ndarray = np.array([0.0, 0.0, 0.0])
     target: Any = None
-    up_axis: np.ndarray = np.array([0.0, 1.0, 0.0])
+    visible: bool = True
+
+    x_up: np.ndarray = np.array([1.0, 0.0, 0.0])
+    z_down: np.ndarray = np.array([0.0, 0.0, -1.0])
+    up_axis: np.ndarray = None
     distance_factor: int = 3
     orthographic_scale_factor: int = 1
 
@@ -47,37 +51,56 @@ class CameraModel:
 
 @dataclass
 class AtlasUIModel:
-    CONTEXTS = ['default', 'slicing', 'visiblity_groups', 'time_series', 'measuring', 'movie_export']
+    CONTEXTS = ['default_slicing', 'arbitrary_slicing', 'probes', 'time_series', 'measuring', 'movie_export']
 
     font = 'Source Sans Pro'
-    font_scale = 0.75
-    toggle_config = {'c':["black", "#eeeeee"], 'bc':["#dddddd", "#999999"], 'font':font, 'size':14, 'bold':False, 'italic':False}
-    button_config = {'c':["black", "black"], 'bc':["#dddddd", "#dddddd"], 'font':font, 'size':14, 'bold':False, 'italic':False}
-    slider_config = {'titleSize':font_scale, 'font':font}
+    font_size = 5
+    toggle_config = {'c':["black", "#eeeeee"], 'bc':["#dddddd", "#999999"], 'font':font, 'size':font_size, 'bold':False, 'italic':False}
+    button_config = {'c':["black", "black"], 'bc':["#dddddd", "#dddddd"], 'font':font, 'size':font_size, 'bold':False, 'italic':False}
+    slider_config = {'font':font, 'size':font_size}
 
-    atlas_visible: bool = True
     context: str = CONTEXTS[0]
+    last_context: str = None
+    main_context: str = None
     jupyter: bool =  False
     embed: bool = True
+    visible: bool = True
+
+    first_picked_position: np.ndarray = None
+    last_picked_position: np.ndarray = None
+
+    def is_context_probes(self):
+        return self.context == AtlasUIModel.CONTEXTS[2]
+
+    def toggle_context(self, context):
+        if self.main_context is None:
+            self.main_context = self.context
+        else:
+            self.context = self.main_context
+            self.main_context = None
 
     def set_context(self, context):
         """
         Set the context
         :param context: A context from CONTEXTS
+        :return: True if context was changed
         """
         if context is None:
             return
         if context in AtlasUIModel.CONTEXTS:
+            self.last_context = self.context
             self.context = context
+            return True
         else:
-            logging.error('Context ' + str(context) + ' is invalid. Ignoring it.')
+            #logging.error('Context ' + str(context) + ' is invalid. Ignoring it.')
+            return False
 
 
 @dataclass
 class AtlasModel:
-    # Default origin is "bregma", an origin defined at the center of the XY axes (not on Z)
+    # Default origin is "bregma", an origin defined at the center of the XY axes (not on Z)
     # For reference, bregma is np.array([5739.0, 5400.0, 332.0])
-    # And for some reason, it's not exactly in the middle of X axis (should be 5400.0)...
+    # And for some reason, it's not exactly in the middle of X axis (should be 5400.0)...
     IBL_BREGMA_ORIGIN = ibllib.atlas.ALLEN_CCF_LANDMARKS_MLAPDV_UM['bregma']
     ALLEN_ATLAS_RESOLUTIONS = [10, 25, 50, 100]
     LINES_PREFIX = '[Lines]'
@@ -91,16 +114,25 @@ class AtlasModel:
     transfer_function_id: int = 0
     volume: VolumeModel = None
     slicer: SlicerModel = None
+    ui: AtlasUIModel = None
     selection: Any = None
+
+    timer_id: Any = None
+    playback_speed: int = 20 #ms
 
     animation_playing: bool = False
     animation_function: Any = None
     time: float = 0.0
 
     origin: np.ndarray = IBL_BREGMA_ORIGIN
-    # Atlas wrapper, in the case of IBL: ibllib.atlas.AllenAtlas
+    # Atlas wrapper. In IBL context, this is ibllib.atlas.AllenAtlas
     atlas: Any = None
     atlas_mapping_ids: list = None
+
+    atlas_visible: bool = True
+    slices_visible: bool = True
+    info_visible: bool = True
+    interactive_subsampling: bool = True
 
     cameras: dict = field(default_factory=dict)
 
@@ -110,6 +142,7 @@ class AtlasModel:
 
     points: dict = field(default_factory=dict)
     lines: dict = field(default_factory=dict)
+    surfaces: dict = field(default_factory=dict)
     settings: dict = field(default_factory=dict)
 
     def get_num_scalars(self):
@@ -163,7 +196,7 @@ class AtlasModel:
         :param storage_property: A dict that will store this model
         """
         if not hasattr(model, 'name') or model.name == None:
-            logging.error('Model has no name and cannot be registered: ' + str(model))
+            #logging.error('Model has no name and cannot be registered: ' + str(model))
             return
         storage_property[model.name] = model
 
@@ -184,14 +217,14 @@ class AtlasModel:
         if resolution not in AtlasModel.ALLEN_ATLAS_RESOLUTIONS:
             resolution = AtlasModel.ALLEN_ATLAS_RESOLUTIONS[-1]
 
-        logging.info('[AtlasModel] origin: ' + str(self.origin))
-        logging.info('[AtlasModel] resolution: ' + str(resolution))
+        #logging.info('[AtlasModel] origin: ' + str(self.origin))
+        #logging.info('[AtlasModel] resolution: ' + str(resolution))
 
         default_name = 'Atlas'
         self.atlas = ibllib.atlas.AllenAtlas(resolution)
         self.atlas_mapping_ids = list(self.atlas.regions.mappings.keys())
 
-        self.volume = self.get_model('Mouse atlas CCF v3', self.volumes, VolumeModel)
+        self.volume = self.get_model(VolumeModel.VOLUME_PREFIX + 'Allen Mouse Atlas CCF v3', self.volumes, VolumeModel)
         self.volume.resolution = resolution
         self.transfer_function = self.build_atlas_transfer_function(default_name)
         self.atlas_transfer_function = self.transfer_function
@@ -243,6 +276,8 @@ class AtlasModel:
         :param mapping: Mapping, optional. This will process the volume and reassign values depending
         on the chosen mapping.
         """
+        # See https://github.com/int-brain-lab/ibllib/pull/279
+        self.volume.lateralized = '-lr' in mapping
         self.volume.mapping = mapping
         if mode == 0 or mode == 'dwi':
             self.set_allen_dwi_volume()
@@ -287,7 +322,7 @@ class AtlasModel:
         if ibl_back_end:
             if isinstance(atlas_mapping, int):
                 if atlas_mapping > len(self.atlas_mapping_ids) - 1:
-                    logging.error('[AtlasModel.get_mapped_volume()] could not find atlas mapping with id ' + str(atlas_mapping) + '. Returning raw volume...')
+                    #logging.error('[AtlasModel.get_mapped_volume()] could not find atlas mapping with id ' + str(atlas_mapping) + '. Returning raw volume...')
                     return volume
                 map_id = self.atlas_mapping_ids[atlas_mapping]
             elif atlas_mapping is None:
@@ -295,11 +330,11 @@ class AtlasModel:
             else:
                 map_id = atlas_mapping
 
-            # This mapping actually changes the order of the axes in the volume...
+            # This mapping actually changes the order of the axes in the volume...
             volume_data = self.atlas.regions.mappings[map_id][volume]
             # The IBL back-end uses a different convention for memory representation
             volume_data = self.untranspose(volume_data)
-            logging.info('Loaded atlas volume with ' + map_id + ' mapping')
+            #logging.info('Loaded atlas volume with ' + map_id + ' mapping')
         else:
             volume_data = volume
         return volume_data
@@ -312,7 +347,7 @@ class AtlasModel:
         """
         ind = np.where(self.atlas.regions.acronym == acronym)[0]
         if ind.size < 1:
-            return
+            return None, None
         return self.atlas.regions.id[ind], ind
 
     def get_transfer_function_and_id(self, index):
@@ -382,7 +417,7 @@ class AtlasModel:
         if alpha_map is None:
             alpha_map = self.transfer_function.alpha_map
         if alpha_map is None:
-            logging.error('[Method build_regions_alpha_map()] requires that an alpha map is created by build_regions_alpha_map()')
+            #logging.error('[Method build_regions_alpha_map()] requires that an alpha map is created by build_regions_alpha_map()')
             return
         new_alpha_map = np.zeros_like(alpha_map).astype(float)
         new_alpha_map[:, 0] = alpha_map[:, 0]

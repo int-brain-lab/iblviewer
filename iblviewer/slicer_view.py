@@ -1,9 +1,7 @@
 import numpy as np
-import logging
 
+import vedo
 import vtk
-from vedo import *
-from vedo.addons import *
 
 import iblviewer.utils as utils
 
@@ -28,21 +26,6 @@ class SlicerView():
 
         self.actor = None
         self.interactor = None
-
-    def apply_lut(self, lut=None, actor=None):
-        """
-        Apply transfer function with a look-up table
-        :param lut: vtkLookupTable
-        :param actor: The actor to receive this
-        """
-        if (actor is None and self.actor is None):
-            return
-        actor = self.actor if actor is None else actor
-        actor._mapper.SetLookupTable(lut)
-
-        # cmap works for the volume but not for the slice so we build 
-        # our own lut beforehand and use it as above
-        #self.actor.cmap(tf.color_map, alpha=tf.opacity_map)
 
     def reslice(self, volume, origin, normal):
         """
@@ -122,7 +105,7 @@ class SlicerView():
         :return: Mesh actor
         """
         resolution = self.volume_view.model.resolution
-        #volume_center = self.volume_view.model.center
+        volume_center = self.volume_view.model.center
         volume_dimensions = self.volume_view.model.dimensions
         volume_actor = self.volume_view.actor
 
@@ -131,19 +114,69 @@ class SlicerView():
                 # Make value consistent with given normal.
                 value *= normal[axis]
             value = volume_dimensions[axis] + value
+
         if axis == 0:
-            #axis_center = int(volume_dimensions[0] / 2)
             in_volume_slice = int(value) // resolution
-            new_slice = volume_actor.xSlice(in_volume_slice)
         elif axis == 2:
-            #axis_center = int(volume_dimensions[2] / 2)
             in_volume_slice = int(value) // resolution
-            new_slice = volume_actor.zSlice(in_volume_slice)
         else:
-            #axis_center = int(volume_dimensions[1] / 2)
             in_volume_slice = int(value) // resolution
-            new_slice = volume_actor.ySlice(in_volume_slice)
+
+        axis_center = volume_center[axis]
+        half_size = volume_dimensions[axis] / 2
+        if not (axis_center - half_size < in_volume_slice < axis_center + half_size):
+            return None
+
+        if axis == 0:
+            new_slice = self.x_slice(in_volume_slice)
+        elif axis == 2:
+            new_slice = self.z_slice(in_volume_slice)
+        else:
+            new_slice = self.y_slice(in_volume_slice)
+
         return new_slice
+
+    def x_slice(self, i):
+        """
+        Extract the slice at index `i` of volume along x-axis.
+        :param i: I index
+        """
+        vslice = vtk.vtkImageDataGeometryFilter()
+        vslice.SetInputData(self.volume_view.actor.imagedata())
+        nx, ny, nz = self.volume_view.actor.imagedata().GetDimensions()
+        if i>nx-1:
+            i=nx-1
+        vslice.SetExtent(i,i, 0,ny, 0,nz)
+        vslice.Update()
+        return vedo.Mesh(vslice.GetOutput())
+
+    def y_slice(self, j):
+        """
+        Extract the slice at index `j` of volume along y-axis.
+        :param j: J index
+        """
+        vslice = vtk.vtkImageDataGeometryFilter()
+        vslice.SetInputData(self.volume_view.actor.imagedata())
+        nx, ny, nz = self.volume_view.actor.imagedata().GetDimensions()
+        if j>ny-1:
+            j=ny-1
+        vslice.SetExtent(0,nx, j,j, 0,nz)
+        vslice.Update()
+        return vedo.Mesh(vslice.GetOutput())
+
+    def z_slice(self, k):
+        """
+        Extract the slice at index `k` of volume along z-axis.
+        :param k: K index
+        """
+        vslice = vtk.vtkImageDataGeometryFilter()
+        vslice.SetInputData(self.volume_view.actor.imagedata())
+        nx, ny, nz = self.volume_view.actor.imagedata().GetDimensions()
+        if k>nz-1:
+            k=nz-1
+        vslice.SetExtent(0,nx, 0,ny, k,k)
+        vslice.Update()
+        return vedo.Mesh(vslice.GetOutput())
 
     def update(self, value=None, normal=None, axis=None, clipping_planes=None, add_to_scene=True):
         """
@@ -160,7 +193,11 @@ class SlicerView():
         else:
             new_slice = self.slice_on_normal(value, normal)
 
-        self._update(new_slice, clipping_planes, add_to_scene)
+        if new_slice is not None:
+            self._update(new_slice, clipping_planes, add_to_scene)
+        else:
+            self.plot.remove([self.actor, self.interactor], render=True)
+            self.actor = new_slice
         
     def _update(self, new_slice, clipping_planes=None, add_to_scene=True):
         """
@@ -172,15 +209,28 @@ class SlicerView():
         if new_slice is None:
             return
 
-        new_slice.pickable(True)
+        last_actor = self.actor
+        last_interactor = self.interactor
+        self.actor = new_slice
+
         #new_slice.UseBoundsOff() # avoid resetting the cam
         new_slice.lighting('off')
+
+        self.apply_lut(self.atlas_model.transfer_function.lut)
+        #self.actor.cmap(tf.slice_color_map)#, alpha=tf.opacity_map)
         
-        new_slice._mapper.SetScalarVisibility(1)
-        # Without setting scalar range, the mapping will be off
-        new_slice._mapper.SetScalarRange(0, self.atlas_model.atlas.regions.id.size)
+        #new_slice._mapper.SetScalarVisibility(1)
+        new_slice._mapper.SetScalarModeToUsePointData() #SetScalarModeToUsePointFieldData
         new_slice._mapper.SetColorModeToMapScalars()
-        new_slice._mapper.SetScalarModeToUsePointData()
+        new_slice._mapper.ScalarVisibilityOn()
+        new_slice._mapper.SetStatic(True)
+        # This very line below will mess up the entire slice coloring if set to True (by default)!!!
+        new_slice._mapper.SetInterpolateScalarsBeforeMapping(False)
+        # Without setting scalar range, the mapping will be off
+        #new_slice._mapper.SetScalarRange(0, self.atlas_model.atlas.regions.id.size)
+        new_slice._mapper.SetUseLookupTableScalarRange(True)
+        #print('using lut scalar range', new_slice._mapper.GetUseLookupTableScalarRange())
+
         # As per a bug in VTK 9 that I found while using vedo that makes pickable fail when
         # there is transparency as per https://github.com/marcomusy/vedo/issues/291
         # Force opaque fix should be gone with the next update of VTK (hopefully)
@@ -188,14 +238,10 @@ class SlicerView():
         new_slice.pickable(True)
         new_slice.name = self.model.name
 
-        self.plot.remove(self.actor, render=False)
-        self.plot.remove(self.interactor, render=False)
-
         if clipping_planes is not None:
             new_slice.mapper().SetClippingPlanes(clipping_planes)
 
-        self.actor = new_slice
-        self.apply_lut(self.atlas_model.transfer_function.lut)
+        self.plot.remove([last_actor, last_interactor], render=False)
         if add_to_scene:
             self.plot.add([new_slice])
 
@@ -207,3 +253,14 @@ class SlicerView():
         interactor_plane.pickable(True) 
         """
         #self.interactor = interactor_plane
+
+    def apply_lut(self, lut=None, actor=None):
+        """
+        Apply transfer function with a look-up table
+        :param lut: vtkLookupTable
+        :param actor: The actor to receive this
+        """
+        if (actor is None and self.actor is None):
+            return
+        actor = self.actor if actor is None else actor
+        actor._mapper.SetLookupTable(lut)

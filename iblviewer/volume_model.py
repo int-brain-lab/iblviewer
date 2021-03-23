@@ -16,18 +16,21 @@ class VolumeModel:
     SEGMENTED = 'segmented'
     NORMALIZED_VOLUME_SUFFIX = '_norm'
     VOLUME_TYPES = {DWI:0, SEGMENTED:1}
+    VOLUME_PREFIX = '[Volume]'
 
-    name: str = '[Volume]'
+    name: str = VOLUME_PREFIX
     file_path: str = None
-    # In early 2021, either 'Beryl', a made-up name for grouping
+    # In early 2021, either 'Beryl', a made-up name for grouping 
     # some cortical layers and the default 'Atlas'. 
     # See ibllib.atlas.regions.mappings
     mapping_name: str = None
-    # Mapping function. If None, the volume will be given as it is.
-    mapping: Any = 'Allen-lr'
+    lateralized: bool = False
+    # Mapping function. If None, the volume will be given as it is.
+    mapping: Any = 'Allen'
     resolution: int = 25
     volume: np.ndarray = None
     volume_type: str = None
+    interactive_subsampling: bool = True
     dimensions: np.ndarray = np.zeros(3).astype(np.float64)
     center: np.ndarray = np.zeros(3).astype(np.float64)
 
@@ -73,7 +76,7 @@ class VolumeModel:
             volume = self.import_volume(mod_file_path)
         else:
             volume = self.import_volume(file_path)
-            volume = self.reassign_scalars(volume, mod_file_path)
+            volume = self.change_labels(volume, mod_file_path)
             logging.info('Reassigned scalar values in volume: ' + str(utils.time_diff(time)) + 's')
         
         if volume is not None:
@@ -87,7 +90,7 @@ class VolumeModel:
             self.volume = volume
         return volume
 
-    def reassign_scalars(self, volume, df_column_map, write_path=None):
+    def change_labels(self, volume, df_column_map, write_path=None):
         """
         Reassign scalar values to something that makes more sense.
         There are two issues we fix here:

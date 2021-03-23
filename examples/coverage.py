@@ -42,7 +42,7 @@ def compute_coverage_volume():
     return cvol
 
 
-def add_vol(controller, vol):
+def add_volume(controller, vol):
     """
     This is a complete hack just to get a display for prototype.
     We need to build a proper primitive to add other full volume channels (ie. not going through
@@ -84,10 +84,9 @@ cvol = compute_coverage_volume()
 ncov = cvol.copy()
 ncov[ncov > 0] = -1
 ncov += 1
-add_vol(controller, ncov)
+add_volume(controller, ncov)
 
 ncov[ncov == -1] = np.nan
-
 
 plt.figure(), plot_agg(ncov, 2, ax=ba.plot_hslice(-.002), ba=ba, alpha=0.5)
 plt.figure(), plot_agg(ncov, 1, ax=ba.plot_sslice(0), ba=ba, alpha=0.5)

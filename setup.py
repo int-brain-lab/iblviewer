@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'iblviewer', 
-    version='1.0.0',   
+    version='1.0.1',   
     description='A example Python package',
     url='https://github.com/int-brain-lab/iblviewer',
     author='Nicolas Antille',
@@ -10,13 +10,15 @@ setup(
     license='MIT',
     packages=['iblviewer'],
     install_requires=['numpy',
-                      'vtk>=9.0',
-                      'ibllib>=1.5.37',
                       'matplotlib',
                       'pandas',
                       'pynrrd',
                       'trimesh',
-                      'vedo',
+                      'k3d',
+                      'vtk>=9.0',
+                      'ibllib>=1.6.0',
+                      'vedo>=2021.0.2',
+                      'ipyvtk-simple',
                       ],
 
     classifiers=[

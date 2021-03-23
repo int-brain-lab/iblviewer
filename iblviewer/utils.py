@@ -5,7 +5,161 @@ import os
 from vtk.util.numpy_support import numpy_to_vtk
 import vtk
 import vedo
-from vedo import *
+import math
+from pathlib import Path
+ROOT_FOLDER = Path(__file__).parent.parent
+
+
+def Cross3DExt(pos=(0,0,0), size=1.0, thickness=0.25, color="b", alpha=1, res=4, lines_mode=True):
+    """
+    Build a 3D cross shape, mainly useful as a 3D marker.
+    """
+    if lines_mode:
+        x1 = np.array([1.0, 0.0, 0.0]) * size / 2
+        x2 = np.array([-1.0, 0.0, 0.0]) * size / 2
+        c1 = vedo.Line(x1, x2, lw=thickness)
+
+        y1 = np.array([0.0, 1.0, 0.0]) * size / 2
+        y2 = np.array([0.0, -1.0, 0.0]) * size / 2
+        c2 = vedo.Line(y1, y2, lw=thickness)
+
+        z1 = np.array([0.0, 0.0, 1.0]) * size / 2
+        z2 = np.array([0.0, 0.0, -1.0]) * size / 2
+        c3 = vedo.Line(z1, z2, lw=thickness)
+    else:
+        c1 = vedo.Cylinder(r=thickness, height=size, res=res)
+        c2 = vedo.Cylinder(r=thickness, height=size, res=res).rotateX(90)
+        c3 = vedo.Cylinder(r=thickness, height=size, res=res).rotateY(90)
+    cross = vedo.merge(c1,c2,c3).color(color).alpha(alpha)
+    cross.SetPosition(pos)
+    cross.name = "[Marker]"
+    return cross
+
+
+class LinesExt(vedo.Line):
+    """
+    Improved Lines class from vedo. 
+    This one accepts point sets of varying lengths
+    """
+    def __init__(self, point_sets, c='gray', alpha=1, lw=1, dotted=False):
+        
+        polylns = vtk.vtkAppendPolyData()
+        for point_set in point_sets:
+            # This part taken from class Line, which accepts n points
+            ppoints = vtk.vtkPoints()  # Generate the polyline
+            ppoints.SetData(numpy_to_vtk(np.ascontiguousarray(point_set), deep=True))
+            lines = vtk.vtkCellArray()
+            npt = len(point_set)
+            lines.InsertNextCell(npt)
+            for i in range(npt):
+                lines.InsertCellPoint(i)
+            poly = vtk.vtkPolyData()
+            poly.SetPoints(ppoints)
+            poly.SetLines(lines)
+            polylns.AddInputData(poly)
+        polylns.Update()
+
+        vedo.Mesh.__init__(self, polylns.GetOutput(), c, alpha)
+        self.lw(lw).lighting('off')
+        if dotted:
+            self.GetProperty().SetLineStipplePattern(0xF0F0)
+            self.GetProperty().SetLineStippleRepeatFactor(1)
+        self.name = "[Lines]"
+
+
+class SpheresExt(vedo.Mesh):
+    """
+    Build a set of spheres at `centers` of radius `r`.
+    Either `c` or `r` can be a list of RGB colors or radii.
+    """
+    def __init__(self, centers, r=1, c="r", alpha=1, res=8):
+
+        if isinstance(centers, vedo.Points):
+            centers = centers.points()
+
+        cisseq = False
+        if vedo.utils.isSequence(c):
+            cisseq = True
+
+        if cisseq:
+            if len(centers) > len(c):
+                vedo.printc("\times Mismatch in Spheres() colors", len(centers), len(c), c='r')
+                raise RuntimeError()
+            if len(centers) != len(c):
+                vedo.printc("\lightningWarning: mismatch in Spheres() colors", len(centers), len(c))
+
+        risseq = False
+        if vedo.utils.isSequence(r):
+            risseq = True
+
+        if risseq:
+            if len(centers) > len(r):
+                vedo.printc("times Mismatch in Spheres() radius", len(centers), len(r), c='r')
+                raise RuntimeError()
+            if len(centers) != len(r):
+                vedo.printc("\lightning Warning: mismatch in Spheres() radius", len(centers), len(r))
+        if cisseq and risseq:
+            vedo.printc("\noentry Limitation: c and r cannot be both sequences.", c='r')
+            raise RuntimeError()
+
+        src = vtk.vtkSphereSource()
+        if not risseq:
+            src.SetRadius(r)
+        if vedo.utils.isSequence(res):
+            res_t, res_phi = res
+        else:
+            res_t, res_phi = 2*res, res
+
+        src.SetThetaResolution(res_t)
+        src.SetPhiResolution(res_phi)
+        src.Update()
+
+        psrc = vtk.vtkPointSource()
+        psrc.SetNumberOfPoints(len(centers))
+        psrc.Update()
+        pd = psrc.GetOutput()
+        vpts = pd.GetPoints()
+
+        glyph = vtk.vtkGlyph3D()
+        glyph.SetSourceConnection(src.GetOutputPort())
+
+        if cisseq:
+            glyph.SetColorModeToColorByScalar()
+            ucols = vtk.vtkUnsignedCharArray()
+            ucols.SetNumberOfComponents(3)
+            ucols.SetName("colors")
+            #for i, p in enumerate(centers):
+            for cx, cy, cz in c:
+                #cx, cy, cz = getColor(acol)
+                ucols.InsertNextTuple3(cx * 255, cy * 255, cz * 255)
+            pd.GetPointData().SetScalars(ucols)
+            glyph.ScalingOff()
+        elif risseq:
+            glyph.SetScaleModeToScaleByScalar()
+            urads = numpy_to_vtk(np.ascontiguousarray(2*r).astype(float), deep=True)
+            urads.SetName("radii")
+            pd.GetPointData().SetScalars(urads)
+
+        vpts.SetData(numpy_to_vtk(np.ascontiguousarray(centers), deep=True))
+
+        glyph.SetInputData(pd)
+        glyph.Update()
+
+        vedo.Mesh.__init__(self, glyph.GetOutput(), alpha=alpha)
+        self.phong()
+
+        self._polydata = pd
+
+        if cisseq:
+            self.mapper().ScalarVisibilityOn()
+        else:
+            self.mapper().ScalarVisibilityOff()
+            self.GetProperty().SetColor(vedo.getColor(c))
+        self.name = "[Spheres]"
+
+
+def spherical_degree_angles_to_xyz(radius, theta, phi):
+    return vedo.spher2cart(radius, theta / 180 * math.pi, phi / 180 * math.pi) 
 
 
 def add_callback(plot, event_name, func, priority=0.0):
@@ -59,7 +213,7 @@ def add_callback(plot, event_name, func, priority=0.0):
 
         dx, dy = x-xp, y-yp
 
-        event_dict = utils.dotdict({
+        event_dict = vedo.utils.dotdict({
             "name": ename,
             "id": cid,
             "priority": priority,
@@ -86,144 +240,48 @@ def add_callback(plot, event_name, func, priority=0.0):
     return cid
 
 
-def Cross3DExt(pos=(0,0,0), size=1.0, thickness=0.3, color="b", alpha=1, res=4):
+def get_file_name(file_name, extension):
     """
-    Build a 3D cross shape, mainly useful as a 3D marker.
+    Get full file name
+    :param file_name: File name without extension
+    :param extension: File extension
+    :return: File name with extension
     """
-    c1 = Cylinder(r=thickness, height=size, res=res)
-    c2 = Cylinder(r=thickness, height=size, res=res).rotateX(90)
-    c3 = Cylinder(r=thickness, height=size, res=res).rotateY(90)
-    cr = merge(c1,c2,c3).color(color).alpha(alpha)
-    cr.SetPosition(pos)
-    cr.name = "[Marker]"
-    return cr
+    if str(file_name).endswith(extension):
+        full_file_name = str(file_name)
+    else:
+        full_file_name = str(file_name) + '.' + str(extension)
+    return full_file_name
 
 
-class LinesExt(Line):
+def get_local_data_file_path(file_name, extension):
     """
-    Improved Lines class from vedo. 
-    This one accepts point sets of varying lengths
+    Get data path
+    :param file_name: File name without extension
+    :param extension: File extension
+    :return: File path
     """
-    def __init__(self, point_sets, c='gray', alpha=1, lw=1, dotted=False):
-        
-        polylns = vtk.vtkAppendPolyData()
-        for point_set in point_sets:
-            # This part taken from class Line, which accepts n points
-            ppoints = vtk.vtkPoints()  # Generate the polyline
-            ppoints.SetData(numpy_to_vtk(np.ascontiguousarray(point_set), deep=True))
-            lines = vtk.vtkCellArray()
-            npt = len(point_set)
-            lines.InsertNextCell(npt)
-            for i in range(npt):
-                lines.InsertCellPoint(i)
-            poly = vtk.vtkPolyData()
-            poly.SetPoints(ppoints)
-            poly.SetLines(lines)
-            polylns.AddInputData(poly)
-        polylns.Update()
-
-        Mesh.__init__(self, polylns.GetOutput(), c, alpha)
-        self.lw(lw).lighting('off')
-        if dotted:
-            self.GetProperty().SetLineStipplePattern(0xF0F0)
-            self.GetProperty().SetLineStippleRepeatFactor(1)
-        self.name = "[Lines]"
+    return ROOT_FOLDER.joinpath('./data/surfaces/' + get_file_name(file_name, extension))
 
 
-class SpheresExt(Mesh):
+def load_surface_mesh(file_name, meshes_path=None, extension='ply', auto_rotate_xz=True):
     """
-    Build a set of spheres at `centers` of radius `r`.
-    Either `c` or `r` can be a list of RGB colors or radii.
+    Load a surface mesh with vedo.
+    :param file_name: File name without extension
+    :param meshes_path: Folder path. If None given, this method will look into the data folder of iblviewer
+    :param extension: File extension
+    :return: Mesh or None if path is invalid
     """
-    def __init__(self, centers, r=1, c="r", alpha=1, res=8):
-
-        if isinstance(centers, Points):
-            centers = centers.points()
-
-        cisseq = False
-        if utils.isSequence(c):
-            cisseq = True
-
-        if cisseq:
-            if len(centers) > len(c):
-                printc("\times Mismatch in Spheres() colors", len(centers), len(c), c='r')
-                raise RuntimeError()
-            if len(centers) != len(c):
-                printc("\lightningWarning: mismatch in Spheres() colors", len(centers), len(c))
-
-        risseq = False
-        if utils.isSequence(r):
-            risseq = True
-
-        if risseq:
-            if len(centers) > len(r):
-                printc("times Mismatch in Spheres() radius", len(centers), len(r), c='r')
-                raise RuntimeError()
-            if len(centers) != len(r):
-                printc("\lightning Warning: mismatch in Spheres() radius", len(centers), len(r))
-        if cisseq and risseq:
-            printc("\noentry Limitation: c and r cannot be both sequences.", c='r')
-            raise RuntimeError()
-
-        src = vtk.vtkSphereSource()
-        if not risseq:
-            src.SetRadius(r)
-        if utils.isSequence(res):
-            res_t, res_phi = res
-        else:
-            res_t, res_phi = 2*res, res
-
-        src.SetThetaResolution(res_t)
-        src.SetPhiResolution(res_phi)
-        src.Update()
-
-        psrc = vtk.vtkPointSource()
-        psrc.SetNumberOfPoints(len(centers))
-        psrc.Update()
-        pd = psrc.GetOutput()
-        vpts = pd.GetPoints()
-
-        glyph = vtk.vtkGlyph3D()
-        glyph.SetSourceConnection(src.GetOutputPort())
-
-        if cisseq:
-            glyph.SetColorModeToColorByScalar()
-            ucols = vtk.vtkUnsignedCharArray()
-            ucols.SetNumberOfComponents(3)
-            ucols.SetName("colors")
-            #for i, p in enumerate(centers):
-            for cx, cy, cz in c:
-                #cx, cy, cz = getColor(acol)
-                ucols.InsertNextTuple3(cx * 255, cy * 255, cz * 255)
-            pd.GetPointData().SetScalars(ucols)
-            glyph.ScalingOff()
-        elif risseq:
-            glyph.SetScaleModeToScaleByScalar()
-            urads = numpy_to_vtk(np.ascontiguousarray(2*r).astype(float), deep=True)
-            urads.SetName("radii")
-            pd.GetPointData().SetScalars(urads)
-
-        vpts.SetData(numpy_to_vtk(np.ascontiguousarray(centers), deep=True))
-
-        glyph.SetInputData(pd)
-        glyph.Update()
-
-
-        Mesh.__init__(self, glyph.GetOutput(), alpha=alpha)
-        self.phong()
-
-        self._polydata = pd
-
-        if cisseq:
-            self.mapper().ScalarVisibilityOn()
-        else:
-            self.mapper().ScalarVisibilityOff()
-            self.GetProperty().SetColor(getColor(c))
-        self.name = "[Spheres]"
-
-
-def spherical_degree_angles_to_xyz(radius, theta, phi):
-    return spher2cart(radius, theta / 180 * math.pi, phi / 180 * math.pi) 
+    if meshes_path is None:
+        region_mesh_path = get_local_data_file_path(file_name, extension)
+    else:
+        region_mesh_path = os.path.join(meshes_path, get_file_name(file_name, extension))
+    if os.path.exists(region_mesh_path):
+        actor = vedo.load(str(region_mesh_path))
+        if auto_rotate_xz:
+            actor.rotateX(90)
+            actor.rotateZ(90)
+        return actor
 
 
 def change_file_name(file_path, prefix=None, name=None, suffix=None):
@@ -274,7 +332,7 @@ def get_actor_center(actor):
     :return: 3d array
     """
     try:
-        if isinstance(actor, Volume):
+        if isinstance(actor, vedo.Volume):
             return actor.center() + actor.pos()
         else:
             return actor.centerOfMass() + actor.pos() # TODO: check that this is necessary (adding pos)
@@ -289,13 +347,33 @@ def get_actor_dimensions(actor):
     :return: 3d array
     """
     try:
-        if isinstance(actor, Volume):
+        if isinstance(actor, vedo.Volume):
             return actor.dimensions() * actor.spacing()# equivalent to self.model.resolution
         else:
             xmin, xmax, ymin, ymax, zmin, zmax = actor.bounds()
             return np.array([xmax - xmin, ymax - ymin, zmax - zmin])
     except Exception as e:
         raise e
+
+
+def intersectWithLine(actor, p0, p1):
+    """
+    Return the list of points intersecting the mesh
+    along the segment defined by two points `p0` and `p1`.
+    """
+    if not actor.line_locator:
+        actor.line_locator = vtk.vtkOBBTree()
+        actor.line_locator.SetDataSet(actor.polydata())
+        actor.line_locator.BuildLocator()
+
+    intersectPoints = vtk.vtkPoints()
+    actor.line_locator.IntersectWithLine(p0, p1, intersectPoints, None)
+    pts = []
+    for i in range(intersectPoints.GetNumberOfPoints()):
+        intersection = [0, 0, 0]
+        intersectPoints.GetPoint(i, intersection)
+        pts.append(intersection)
+    return pts
 
 
 def get_transformation_matrix(origin, normal):
@@ -305,7 +383,7 @@ def get_transformation_matrix(origin, normal):
     :param normal: Normal 3D vector
     :return: Matrix and Translation
     """
-    newaxis = utils.versor(normal)
+    newaxis = vedo.utils.versor(normal)
     initaxis = (0, 0, 1)
     crossvec = np.cross(initaxis, newaxis)
     angle = np.arccos(np.dot(initaxis, newaxis))
@@ -318,7 +396,7 @@ def get_transformation_matrix(origin, normal):
 
 
 def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYOffset=15, titleFontSize=12,
-                    size=(None,None), nlabels=None, horizontal=False, useAlpha=True):
+                    size=(None,None), nlabels=None, horizontal=False, useAlpha=False):
     """
     Add a 2D scalar bar for the specified obj. Modified method from vedo.addons.addScalarBar
     :param list pos: fractional x and y position in the 2D window
@@ -346,7 +424,7 @@ def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYO
 
     if title:
         if "\\" in repr(title):
-            for r in shapes._reps:
+            for r in vedo.shapes._reps:
                 title = title.replace(r[0], r[1])
         titprop = sb.GetTitleTextProperty()
         titprop.BoldOn()
@@ -356,7 +434,7 @@ def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYO
         titprop.SetVerticalJustificationToTop()
         titprop.SetFontSize(titleFontSize)
         titprop.SetFontFamily(vtk.VTK_FONT_FILE)
-        titprop.SetFontFile(settings.fonts_path + settings.defaultFont +'.ttf')
+        titprop.SetFontFile(vedo.settings.fonts_path + vedo.settings.defaultFont +'.ttf')
         sb.SetTitle(title)
         sb.SetVerticalTitleSeparation(titleYOffset)
         sb.SetTitleTextProperty(titprop)
@@ -388,7 +466,7 @@ def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYO
 
     sctxt = sb.GetLabelTextProperty()
     sctxt.SetFontFamily(vtk.VTK_FONT_FILE)
-    sctxt.SetFontFile(settings.fonts_path + settings.defaultFont +'.ttf')
+    sctxt.SetFontFile(vedo.settings.fonts_path + vedo.settings.defaultFont +'.ttf')
     sctxt.SetColor(font_color)
     sctxt.ItalicOff()
     sctxt.SetShadow(0)
@@ -403,7 +481,7 @@ def add_caption_symbol(point, size=0.5, color='red', alpha=1.0, overlay_2d=True)
     Modified from vedo caption() method
     """
     #c = np.array(self.GetProperty().GetColor())/2
-    color = colors.getColor(color)
+    color = vedo.colors.getColor(color)
 
     """
     if point is None:
@@ -463,22 +541,13 @@ def add_caption_symbol(point, size=0.5, color='red', alpha=1.0, overlay_2d=True)
     return caption
 
 
-
-# ------------------------------ WORK IN PROGRESS, NOT SURE THE BELOW METHODS WILL STAY HERE
-def add_region_surface(region_id=997, meshes_path='./data/allen/structure/structure_meshes/clean_ply/', ext='ply'):
-    #if region_id == 997:
-        #region_id = str(region_id) + 'm'
-    region_mesh_path = meshes_path + str(region_id) + '.' + ext
-    if os.path.exists(region_mesh_path):
-        return load(region_mesh_path)
-
-def read_surfaces(glb_path='./data/surfaces/brain_regions_leaves_one_up.glb'):
+def load_gltf_mesh(file_path='./data//brain_regions.glb'):
     """
     Read surface data from a binary GLTF scene
     """
     loader = vtk.vtkGLTFDocumentLoader()
     reader = vtk.vtkGLTFReader()
-    reader.SetFileName(glb_path)
+    reader.SetFileName(file_path)
     reader.Update() 
     #reader.Read()
 
