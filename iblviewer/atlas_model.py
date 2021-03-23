@@ -53,7 +53,7 @@ class CameraModel:
 class AtlasUIModel:
     CONTEXTS = ['default_slicing', 'arbitrary_slicing', 'probes', 'time_series', 'measuring', 'movie_export']
 
-    font = 'Source Sans Pro'
+    font = 'Arial' #'Source Sans Pro'
     font_size = 5
     toggle_config = {'c':["black", "#eeeeee"], 'bc':["#dddddd", "#999999"], 'font':font, 'size':font_size, 'bold':False, 'italic':False}
     button_config = {'c':["black", "black"], 'bc':["#dddddd", "#dddddd"], 'font':font, 'size':font_size, 'bold':False, 'italic':False}
