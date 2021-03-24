@@ -31,8 +31,8 @@ class VolumeModel:
     volume: np.ndarray = None
     volume_type: str = None
     interactive_subsampling: bool = True
-    dimensions: np.ndarray = np.zeros(3).astype(np.float64)
-    center: np.ndarray = np.zeros(3).astype(np.float64)
+    dimensions: np.ndarray = np.zeros(3).astype(float)
+    center: np.ndarray = np.zeros(3).astype(float)
 
     def is_segmented_volume(self):
         """

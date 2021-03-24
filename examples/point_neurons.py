@@ -47,7 +47,7 @@ def add_point_neurons(controller, data, with_labels=False):
             #positions.append(bad_stuff[:3])
         regions.append(weird_data[3])
         timings.append(weird_data[4:])
-    positions = np.array(positions).astype(np.float)
+    positions = np.array(positions).astype(float)
 
     timings = np.array(timings)
     regions = np.array(regions)

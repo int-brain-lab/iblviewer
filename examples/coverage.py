@@ -21,7 +21,7 @@ def compute_coverage_volume():
     # read the channels files and create a volume with one in each voxel containing a spike
     channels = pd.read_parquet(file_channels)
     ba = AllenAtlas(25)
-    cvol = np.zeros(ba.image.shape, dtype=np.float)
+    cvol = np.zeros(ba.image.shape, dtype=float)
     xyz = np.c_[channels['ml'].to_numpy(), channels['ap'].to_numpy(), channels['dv'].to_numpy()] / 1e6
     iii = ba.bc.xyz2i(xyz)
     cvol[np.unravel_index(ba._lookup(xyz), cvol.shape)] = 1
@@ -48,7 +48,7 @@ def add_volume(controller, vol):
     We need to build a proper primitive to add other full volume channels (ie. not going through
     mapping) for the visualizer
     """
-    controller.model.volume.volume = np.transpose((vol).astype(np.int), (2, 0, 1))
+    controller.model.volume.volume = np.transpose((vol).astype(int), (2, 0, 1))
     controller.view = AtlasView(controller.plot, controller.model)
     controller.view.initialize()
 

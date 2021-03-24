@@ -147,7 +147,7 @@ class AtlasView():
         line_id = 0
         for index in target:
             point_set = point_sets[index]
-            point_set = np.array(point_set).astype(np.float)
+            point_set = np.array(point_set).astype(float)
             if use_origin:
                 point_set = point_set * [[1, -1, -1]] + self.model.origin
             points_lists.append(point_set)

@@ -52,7 +52,7 @@ class VolumeView():
         self.actor.pos(spacing / 2)
 
         # TODO: Compute this in the model and check here when creating the actor that size matches?
-        self.model.dimensions = np.array(self.actor.dimensions()).astype(np.float64) * self.model.resolution
+        self.model.dimensions = np.array(self.actor.dimensions()).astype(float) * self.model.resolution
         # center() is also wrong on the volume when spacing is used as it's not exactly dimensions() / 2
         self.model.center = np.array(self.actor.pos()) + np.array(self.actor.center())
 
@@ -88,7 +88,7 @@ class VolumeView():
             alpha_map = self.atlas_model.transfer_function.alpha_map
         if alpha_factor is None:
             alpha_factor = self.alpha_factor
-        volume_alpha_map = np.ones_like(alpha_map).astype(np.float)
+        volume_alpha_map = np.ones_like(alpha_map).astype(float)
         volume_alpha_map[:] = alpha_map[:]
         volume_alpha_map[:, 1] *= alpha_factor
         self.actor.alpha(volume_alpha_map)
