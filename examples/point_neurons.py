@@ -1,12 +1,11 @@
-# DEMO 2: add point neurons from connectivity data
+# Add point neurons from connectivity data
 from pathlib import Path
 
 import numpy as np
 import pickle
 
 from iblviewer import atlas_controller
-
-EXAMPLE_FOLDER = Path(__file__).parent
+from iblviewer import utils
 
 '''
 # Invoke your own code with the lines below but you should wrap it in
@@ -75,7 +74,7 @@ if __name__ == '__main__':
         './data/exp3_3dd347df-f14e-40d5-9ff2-9c49f84d2157_both',
         './data/exp4_3c851386-e92d-4533-8d55-89a46f0e7384_both',
         './data/exp5_158d5d35-a2ab-4a76-87b0-51048c5d5283_both']
-    data = [EXAMPLE_FOLDER.joinpath(d) for d in data]
+    data = [utils.EXAMPLES_DATA_FOLDER.joinpath(d) for d in data]
     for data_set in data:
         add_point_neurons(controller, data_set)
     

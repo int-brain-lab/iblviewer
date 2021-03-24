@@ -7,7 +7,11 @@ import vtk
 import vedo
 import math
 from pathlib import Path
+
+
 ROOT_FOLDER = Path(__file__).parent.parent
+EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./examples')
+EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./examples/data')
 
 
 def Cross3DExt(pos=(0,0,0), size=1.0, thickness=0.25, color="b", alpha=1, res=4, lines_mode=True):
