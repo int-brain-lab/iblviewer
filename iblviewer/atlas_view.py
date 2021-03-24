@@ -77,6 +77,12 @@ class AtlasView():
         settings.useFXAA = True
         settings.multiSamples = 0
 
+    def new_segments(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+        """
+        [Please use add_segments instead of new_segments]
+        """
+        self.add_segments(start_points, end_points, line_width, spherical_angles, radians, values, use_origin, relative_end_points, add_to_scene)
+
     def add_segments(self, start_points, end_points=None, line_width=2, spherical_angles=None, radians=True, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
         Add a set of segments
@@ -127,6 +133,12 @@ class AtlasView():
 
     def new_lines(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
+        [Please use add_lines instead of new_lines]
+        """
+        self.add_lines(point_sets, line_width, values, use_origin, relative_end_points, add_to_scene)
+
+    def add_lines(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+        """
         Create a set of lines with given point sets
         :param point_sets: List of lists of 3D coordinates
         :param line_width: Line width, defaults to 2px
@@ -168,6 +180,12 @@ class AtlasView():
         if add_to_scene:
             self.plot.add(lines)
         return lines
+        
+    def new_points(self, positions, radius=10, values=None, color_map='viridis', use_origin=True, noise_amount=0, as_spheres=True, add_to_scene=False):
+        """
+        [Please use add_points instead of new_points]
+        """
+        self.add_points(positions, radius, values, color_map, use_origin, noise_amount, as_spheres, add_to_scene)
 
     def add_points(self, positions, radius=10, values=None, color_map='viridis', use_origin=True, noise_amount=0, as_spheres=True, add_to_scene=False):
         """
