@@ -22,6 +22,8 @@ from iblviewer.volume_view import VolumeView
 from iblviewer.slicer_view import SlicerView
 import iblviewer.utils as utils
 
+from ipyvtk_simple.viewer import ViewInteractiveWidget
+
 
 class AtlasController():
 
@@ -73,15 +75,18 @@ class AtlasController():
         """
         logging.info('Starting IBL Viewer...')
 
-        #vedo.settings.notebookBackend = jupyter
         # This line is necessary as for some reason, vedo's allowInteraction kills the app when we listen to TimerEvents!
         vedo.settings.allowInteraction = False
         if jupyter:
             vedo.embedWindow('ipyvtk')
         self.plot = vedo.Plotter(N=num_windows) if plot is None else plot
         self.plot_window_id = plot_window_id
+        if jupyter:
+            self.plot.offscreen = True
+            self.plot.window.SetOffScreenRendering(1)
+            #self.plot.window.SetSize(1000, 800)
 
-        print('Starting IBLViewer...')
+        print('IBL Viewer...')
 
         self.model = AtlasModel()
         self.model.initialize(resolution)
@@ -156,17 +161,18 @@ class AtlasController():
         """
         return self.plot.window
 
-    def render(self):
+    def render(self, interactive_window=True):
         """
         Render the plot and let the user interact with it
+        :param interactive_window: Whether we render and make the window interactive
         """
         self.plot.resetcam = False
-        jupyter = self.model.ui.jupyter
+        if not interactive_window:
+            self.plot.render()
+            return
 
-        if jupyter:
-            logging.info('\nVisualizer started in Jupyter mode [UI can be slower]: ' + str(utils.time_diff(self.model.runtime)) + 's\n')
-            #self.plot.offscreen = True
-            #self.plot.window.SetOffScreenRendering(1)
+        if self.model.ui.jupyter:
+            logging.info('\nVisualizer started in Jupyter mode: ' + str(utils.time_diff(self.model.runtime)) + 's\n')
             return self.plot.show(self.plot.actors, resetcam=False, interactive=False)
             #return ViewInteractiveWidget(self.plot.window)
         else:
@@ -790,7 +796,7 @@ class AtlasController():
         self.add_button('ventral', self.set_ventral_view, pos=(0.15, 0.90), states=["Ventral"], **btn_kw)
         self.add_button('right', self.set_right_view, pos=(0.15, 0.86), states=["Right"], **btn_kw)
         self.add_button('ortho', self.toggle_orthographic_view, pos=(0.05, 0.82), states=["Orthographic", "Orthographic"], **tog_kw)
-        self.add_button('atlas_view', self.reset_camera_target, pos=(0.05, 0.78), states=["View full atlas"], **btn_kw) # TODO: make a toggle
+        self.add_button('atlas_view', self.reset_camera_target, pos=(0.05, 0.78), states=["Reset view"], **btn_kw) # TODO: make a toggle
 
         #self.axes_button = self.add_button(self.toggle_axes_visibility, pos=(0.05, 0.78), states=["Show axes", "Hide axes"], **tog_kw)
         self.add_button('slices_visibility', self.toggle_slices_visibility, pos=(0.05, 0.66), states=["Slices visible", "Slices hidden"], **tog_kw)
@@ -988,7 +994,7 @@ class AtlasController():
         else:
             volume_property.DisableGradientOpacityOn()
 
-    def update_camera(self, normal=None, view_up=None, scale_factor=1.75, min_distance=1000):
+    def update_camera(self, normal=None, view_up=None, scale_factor=1.5, min_distance=1000):
         """
         Update the camera frustrum
         :param normal: View normal
