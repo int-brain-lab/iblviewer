@@ -81,7 +81,7 @@ class AtlasView():
         """
         [Please use add_segments instead of new_segments]
         """
-        self.add_segments(start_points, end_points, line_width, spherical_angles, radians, values, use_origin, relative_end_points, add_to_scene)
+        return self.add_segments(start_points, end_points, line_width, spherical_angles, radians, values, use_origin, relative_end_points, add_to_scene)
 
     def add_segments(self, start_points, end_points=None, line_width=2, spherical_angles=None, radians=True, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
@@ -135,7 +135,7 @@ class AtlasView():
         """
         [Please use add_lines instead of new_lines]
         """
-        self.add_lines(point_sets, line_width, values, use_origin, relative_end_points, add_to_scene)
+        return self.add_lines(point_sets, line_width, values, use_origin, relative_end_points, add_to_scene)
 
     def add_lines(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
         """
@@ -185,7 +185,7 @@ class AtlasView():
         """
         [Please use add_points instead of new_points]
         """
-        self.add_points(positions, radius, values, color_map, use_origin, noise_amount, as_spheres, add_to_scene)
+        return self.add_points(positions, radius, values, color_map, use_origin, noise_amount, as_spheres, add_to_scene)
 
     def add_points(self, positions, radius=10, values=None, color_map='viridis', use_origin=True, noise_amount=0, as_spheres=True, add_to_scene=False):
         """
@@ -223,11 +223,10 @@ class AtlasView():
                     colors.append(list(vedo.colorMap(value, color_map, min_value, max_value)))
 
         if as_spheres:
-            if isinstance(radius, int) or isinstance(radius, float):
-                radii = [radius] * len(positions)
             points = utils.SpheresExt(positions, r=radius, c=colors)
+            points.cmap(color_map, values, on='points')
         else:
-            points = vedo.Points(positions, r=radii)
+            points = vedo.Points(positions, r=radius)
             points.cmap(color_map, values, on='points')
         points.lighting('off')
         points.pickable(True)

@@ -506,7 +506,8 @@ class AtlasController():
         self.plot.interactor.GetInteractorStyle().On()
 
         # 3. Handle double click case
-        if utils.time_diff(self.last_mouse_time) < 0.25 and (self.last_mouse_position == event.picked2d).all():
+        detla_norm_2d_click = np.linalg.norm(self.last_mouse_position - np.array(event.picked2d))
+        if utils.time_diff(self.last_mouse_time) < 0.5 and detla_norm_2d_click < 4:
             # Double click/tap means we focus the camera on the selection
             #logging.info('Double-click at coordinate ' + str(event.picked3d))
             self.model.camera.target = event.picked3d
@@ -515,7 +516,7 @@ class AtlasController():
         self.last_mouse_time = datetime.now()
 
         # 4. Handle mouse click release with a workaround for bad VTK event mgmt (LeftButtonReleaseEvent does not work)
-        if self.last_mouse_position is None or np.linalg.norm(self.last_mouse_position - np.array(event.picked2d)) > 10:
+        if self.last_mouse_position is None or detla_norm_2d_click > 10:
             return
 
         # 5. Do nothing else if info should not be shown (and not computed either)
@@ -547,7 +548,7 @@ class AtlasController():
         elif event.isMesh and actor.name.startswith(AtlasModel.LINES_PREFIX):
             mesh_id = actor.closestPoint(actor.picked3d, returnCellId=True)
             data_color = np.ones(3)
-            value = actor.GetCellData().GetScalars().GetValue(mesh_id)
+            value = actor._polydata.GetCellData().GetScalars().GetValue(mesh_id)
             position = actor.picked3d
             text = f'\nElement id: {mesh_id}, value: {value}'
             #print('Selected cell', line_id, 'at', precision(mesh.picked3d,3))
@@ -561,8 +562,8 @@ class AtlasController():
             point_locator.FindClosestPoint(event.picked3d)
             """
             point_id = actor.closestPoint(actor.picked3d, returnPointId=True)
-            data_color = np.ones(3)
-            value = actor.GetPointData().GetScalars().GetValue(point_id)
+            data_color = np.ones(3) 
+            value = actor.getPointArray(0)[point_id]
             position = actor.closestPoint(actor.picked3d)
             text += f'\nPoint: {point_id}, value: {value}'
             #np.mean(np.array(actor.closestPoint(actor.picked3d, N=1)), axis=0)
@@ -599,7 +600,7 @@ class AtlasController():
             if len(position) >= 3:
                 #inv_color = np.array([1.0, 1.0, 1.0]) - data_color
                 color = np.ones(3).astype(float) * 0.75 if np.mean(data_color) < 0.5 else np.zeros(3).astype(float)
-                self.selection_point = utils.Cross3DExt(position, size=5000, thickness=2, color=color, alpha=1).pickable(0).lighting('off')
+                self.selection_point = utils.Cross3DExt(position, size=1000, thickness=2, color=color, alpha=1).pickable(0).lighting('off')
                 #self.selection_point = utils.add_caption_symbol(pos)
                 #self.selection_point.caption('x', size=(0.4,0.3), c='black')
                 #self.selection_point.caption(txt, size=(0.3,0.05))
@@ -696,7 +697,7 @@ class AtlasController():
                 nearest_position = nearest_slice_position
 
         # Go "inside" the volume a little bit to have a valid point id
-        position = nearest_position + ray_norm * self.model.volume.resolution
+        position = nearest_position + ray_norm * self.model.volume.resolution * 3
         pt_id = self.view.volume.actor._data.FindPoint(*position)
         scalar_data = self.view.volume.actor._data.GetPointData().GetScalars()
         valid_id = 0 < pt_id < scalar_data.GetNumberOfValues()
@@ -805,7 +806,7 @@ class AtlasController():
         
         s_kw = self.model.ui.slider_config
         self.add_slider('time_series', self.update_time_series, 0, 1, 0, (0.5, 0.15, 0.12), title='Time series', **s_kw)
-        self.add_slider('alpha_unit', self.update_alpha_unit, 0.1, 20.0, 1.0, (0.5, 0.065, 0.12), title='Transparency', **s_kw)
+        self.add_slider('alpha_unit', self.update_alpha_unit, 0.0, 20.0, 1.0, (0.5, 0.065, 0.12), title='Transparency', **s_kw)
         
         d = self.view.volume.model.dimensions
         if d is None:

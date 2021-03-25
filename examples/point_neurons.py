@@ -52,7 +52,7 @@ def add_point_neurons(controller, data, with_labels=False):
     timings = np.array(timings)
     regions = np.array(regions)
     # 16um is a good compromise for visibility from afar. So we make somata roughly 2-3 times larger than they are in reality
-    points = controller.view.new_points(positions, radius=16, values=timings, as_spheres=True, noise_amount=100)
+    points = controller.view.add_points(positions, radius=16, values=timings, as_spheres=True, noise_amount=100)
     
     actors = [points]
     if with_labels:
@@ -70,10 +70,10 @@ if __name__ == '__main__':
     controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 
     data = [
-        './data/exp2_db4df448-e449-4a6f-a0e7-288711e7a75a_both',
-        './data/exp3_3dd347df-f14e-40d5-9ff2-9c49f84d2157_both',
-        './data/exp4_3c851386-e92d-4533-8d55-89a46f0e7384_both',
-        './data/exp5_158d5d35-a2ab-4a76-87b0-51048c5d5283_both']
+        './exp2_db4df448-e449-4a6f-a0e7-288711e7a75a_both',
+        './exp3_3dd347df-f14e-40d5-9ff2-9c49f84d2157_both',
+        './exp4_3c851386-e92d-4533-8d55-89a46f0e7384_both',
+        './exp5_158d5d35-a2ab-4a76-87b0-51048c5d5283_both']
     data = [utils.EXAMPLES_DATA_FOLDER.joinpath(d) for d in data]
     for data_set in data:
         add_point_neurons(controller, data_set)
