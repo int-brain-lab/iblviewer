@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 ROOT_FOLDER = Path(__file__).parent.parent
+DATA_FOLDER = ROOT_FOLDER.joinpath('./data')
 EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./examples')
 EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./examples/data')
 
@@ -265,7 +266,7 @@ def get_local_data_file_path(file_name, extension):
     :param extension: File extension
     :return: File path
     """
-    return ROOT_FOLDER.joinpath('./data/surfaces/' + get_file_name(file_name, extension))
+    return DATA_FOLDER.joinpath('./surfaces/' + get_file_name(file_name, extension))
 
 
 def load_surface_mesh(file_name, meshes_path=None, extension='ply', auto_rotate_xz=True):
@@ -277,11 +278,15 @@ def load_surface_mesh(file_name, meshes_path=None, extension='ply', auto_rotate_
     :return: Mesh or None if path is invalid
     """
     if meshes_path is None:
-        region_mesh_path = get_local_data_file_path(file_name, extension)
+        region_mesh_path = str(get_local_data_file_path(file_name, extension))
+        if not os.path.exists(region_mesh_path):
+            region_mesh_path = 'https://github.com/int-brain-lab/iblviewer/blob/main/data/surfaces/'
+            region_mesh_path += get_file_name(file_name, extension)
     else:
-        region_mesh_path = os.path.join(meshes_path, get_file_name(file_name, extension))
-    if os.path.exists(region_mesh_path):
-        actor = vedo.load(str(region_mesh_path))
+        region_mesh_path = str(os.path.join(meshes_path, get_file_name(file_name, extension)))
+    
+    if region_mesh_path.startswith('https') or os.path.exists(region_mesh_path):
+        actor = vedo.load(region_mesh_path)
         if auto_rotate_xz:
             actor.rotateX(90)
             actor.rotateZ(90)

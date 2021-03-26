@@ -122,6 +122,9 @@ class AtlasController():
 
         self.slicers = [self.px_slicer, self.py_slicer, self.pz_slicer, self.nx_slicer, self.ny_slicer, self.nz_slicer]
 
+        # Ready to "show" so that we can access the camera object
+        self.plot.show(interactive=False)
+
         self.handle_transfer_function_update()
         # By default, the atlas volume is our target
         self.model.camera.target = self.view.volume.actor
@@ -132,11 +135,15 @@ class AtlasController():
             vedo.settings.defaultFont = self.model.ui.font
             self.initialize_embed_ui(slicer_target=self.view.volume)
 
+        result = None
         if render:
             logging.info('Initialization complete. Rendering...')
-            return self.render()
+            result = self.render(False)
         else:
             logging.info('Initialization complete.')
+
+        if jupyter:
+            return result
 
     def add_lines(self):
         # TODO: this method will keep the added lines created in the view
@@ -167,22 +174,14 @@ class AtlasController():
         :param interactive_window: Whether we render and make the window interactive
         """
         self.plot.resetcam = False
-        if not interactive_window:
-            self.plot.render()
-            return
 
         if self.model.ui.jupyter:
             logging.info('\nVisualizer started in Jupyter mode: ' + str(utils.time_diff(self.model.runtime)) + 's\n')
-            return self.plot.show(self.plot.actors, resetcam=False, interactive=False)
+            return self.plot.show(at=self.plot_window_id)
             #return ViewInteractiveWidget(self.plot.window)
         else:
             logging.info('\nVisualizer started: ' + str(utils.time_diff(self.model.runtime)) + 's\n')
-            self.plot.show(self.plot.actors, at=self.plot_window_id, resetcam=False, interactive=True)
-            try:
-                # In Ipython, this seems unecessary and yields an error
-                exit()
-            except Exception:
-                pass
+            self.plot.show(at=self.plot_window_id, interactive=interactive_window)
 
     def add_callback(self, event_name, func, priority=0.0):
         """
