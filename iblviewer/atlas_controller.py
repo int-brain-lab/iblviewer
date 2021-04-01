@@ -576,6 +576,8 @@ class AtlasController():
                 origin = np.array(self.plot.camera.GetPosition())
                 position, value = self.find_nearest_volume_intersection_data(origin, np.array(event.picked3d))
                 
+                if position is None or value is None:
+                    return
                 value = int(value)
                 atlas_id = self.model.atlas.regions.id[value]
                 region = self.model.atlas.regions.get(atlas_id)
@@ -613,13 +615,13 @@ class AtlasController():
 
         self.plot.add(actors_to_add)
 
-    def find_nearest_volume_intersection_data(self, origin, direction_point, max_distance=-1):
+    def find_nearest_volume_intersection_data(self, origin, destination, max_distance=-1):
         """
         Find the nearest volume intersection given a vector formed by two coordinates.
         This function relies on a trick, using surface meshes to get the proper first intersection
         and this works with slicers as well.
-        :param: Origin of the vector
-        :param direction_point: Second point that forms the ray/vector to intersect the volume with
+        :param origin: Origin of the vector
+        :param destination: Second point that forms the ray/vector to intersect the volume with
         :return: The nearest position and its related value queried in the volume image
         """
 
@@ -652,12 +654,13 @@ class AtlasController():
         if max_distance == -1:
             max_distance = max(self.model.volume.dimensions)*2
         origin = np.array(origin)
-        direction_point = np.array(direction_point)
-        ray = direction_point - origin
+        destination = np.array(destination)
+        ray = destination - origin
         ray_norm = ray / np.linalg.norm(ray)
-        direction_point = direction_point + ray_norm * max_distance
-        positions = self.view.volume.surface_actor.intersectWithLine(origin, direction_point)
+        destination = destination + ray_norm * max_distance
 
+        positions = utils.intersect_with_line(self.view.volume.bounding_mesh, origin, destination)
+        
         distances = []
         for p_id in range(len(positions)):
             position = positions[p_id]
@@ -673,13 +676,13 @@ class AtlasController():
             nearest_outer_atlas_position = positions[0]
         else:
             return None, None
-
+        
         nearest_slice_position = None
         shortest_slice_distance = 10000000000
         for slicer in self.slicers:
             if slicer.actor is None:
                 continue
-            position = slicer.actor.intersectWithLine(origin, direction_point)
+            position = utils.intersect_with_line(slicer.actor, origin, destination)
             if position is None or len(position) < 1:
                 continue
             # When intersecting with a plane, we should only have one point
@@ -694,7 +697,8 @@ class AtlasController():
             a_dist = np.linalg.norm(nearest_outer_atlas_position - origin)
             if dist > a_dist:
                 nearest_position = nearest_slice_position
-
+        
+        nearest_position = nearest_outer_atlas_position
         # Go "inside" the volume a little bit to have a valid point id
         position = nearest_position + ray_norm * self.model.volume.resolution * 3
         pt_id = self.view.volume.actor._data.FindPoint(*position)
@@ -993,6 +997,30 @@ class AtlasController():
             volume_property.SetGradientOpacity(alpha_gradient)
         else:
             volume_property.DisableGradientOpacityOn()
+
+    def set_camera(position, quat, camera_distance=10000):
+        """
+        TODO: make it possible to store and assign a camera transformation matrix
+        """
+        raise NotImplementedError
+        camera = vtk.vtkCamera()
+        # Define the quaternion in vtk, note the swapped order
+        # w,x,y,z instead of x,y,z,w
+        quat_vtk = vtk.vtkQuaterniond(quat[3], quat[0], quat[1], quat[2])
+
+        M = np.zeros((3, 3), dtype=np.float32)
+        quat_vtk.ToMatrix3x3(M)
+        up = [0, 1, 0]
+        pos = [0, 0, camera_distance]
+
+        camera.SetViewUp(*np.dot(M, up))
+        camera.SetPosition(*np.dot(M, pos))
+
+        p = camera.GetPosition()
+        p_new = np.array(p) + position
+        camera.SetPosition(*p_new)
+        camera.SetFocalPoint(*position)
+        return camera
 
     def update_camera(self, normal=None, view_up=None, scale_factor=1.5, min_distance=1000):
         """

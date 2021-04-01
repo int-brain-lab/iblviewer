@@ -24,7 +24,7 @@ class VolumeView():
 
         self.actor = None
         self.surface_actor = None
-        self.sphere_actor = None
+        self.bounding_mesh = None
         self.alpha_factor = 0.001 #* self.model.volume.resolution
 
         self.clipping_planes = None
@@ -61,8 +61,8 @@ class VolumeView():
         self.init_clipping_planes()
         self.build_surface_mesh()
         self.plot.add(self.actor, render=False)
-        if self.surface_actor is not None:
-            self.plot.add(self.surface_actor, render=False)
+        #if self.surface_actor is not None:
+        #self.plot.add(self.surface_actor, render=False)
         
         #self.actor.alphaUnit(1)
         #self.actor.jittering(True)
@@ -219,12 +219,15 @@ class VolumeView():
             #logging.error('[VolumeView.build_surface_mesh()] cannot work without the segmented Allen volume')
             return
 
-        self.surface_actor = utils.load_surface_mesh('997')
+        self.bounding_mesh = utils.load_surface_mesh('997')
+        #mesh = vedo.utils.vedo2trimesh(actor)
+        '''
         self.surface_actor.alpha(0)
         self.surface_actor.name = self.model.name + '_surface'
         self.surface_actor.mapper().SetClippingPlanes(self.clipping_planes)
         self.surface_actor.pickable(0)
         #self.surface_actor.ForceOpaqueOn()
+        '''
 
     def set_interactive_subsampling(self, on=False):
         """

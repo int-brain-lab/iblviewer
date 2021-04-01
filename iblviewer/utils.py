@@ -1,12 +1,13 @@
 from datetime import datetime
 import numpy as np
 import os
+from pathlib import Path
 
 from vtk.util.numpy_support import numpy_to_vtk
 import vtk
 import vedo
 import math
-from pathlib import Path
+import trimesh
 
 
 ROOT_FOLDER = Path(__file__).parent.parent
@@ -269,13 +270,13 @@ def get_local_data_file_path(file_name, extension):
     return DATA_FOLDER.joinpath('./surfaces/' + get_file_name(file_name, extension))
 
 
-def load_surface_mesh(file_name, meshes_path=None, extension='ply', auto_rotate_xz=True):
+def get_surface_mesh_path(file_name, meshes_path=None, extension='ply'):
     """
-    Load a surface mesh with vedo.
+    Get a surface mesh file path
     :param file_name: File name without extension
     :param meshes_path: Folder path. If None given, this method will look into the data folder of iblviewer
     :param extension: File extension
-    :return: Mesh or None if path is invalid
+    :return: Full mesh file path.
     """
     if meshes_path is None:
         region_mesh_path = str(get_local_data_file_path(file_name, extension))
@@ -284,13 +285,20 @@ def load_surface_mesh(file_name, meshes_path=None, extension='ply', auto_rotate_
             region_mesh_path += get_file_name(file_name, extension)
     else:
         region_mesh_path = str(os.path.join(meshes_path, get_file_name(file_name, extension)))
-    
-    if region_mesh_path.startswith('https') or os.path.exists(region_mesh_path):
-        actor = vedo.load(region_mesh_path)
-        if auto_rotate_xz:
-            actor.rotateX(90)
-            actor.rotateZ(90)
-        return actor
+    return region_mesh_path
+
+
+def load_surface_mesh(file_name, meshes_path=None, extension='ply'):
+    """
+    Load a surface mesh with vedo.
+    :param file_name: File name without extension
+    :param meshes_path: Folder path. If None given, this method will look into the data folder of iblviewer
+    :param extension: File extension
+    :return: Mesh or None if path is invalid
+    """
+    file_path = get_surface_mesh_path(file_name, meshes_path, extension)
+    if file_path.startswith('https') or os.path.exists(file_path):
+        return vedo.load(file_path)
 
 
 def change_file_name(file_path, prefix=None, name=None, suffix=None):
@@ -365,24 +373,45 @@ def get_actor_dimensions(actor):
         raise e
 
 
-def intersectWithLine(actor, p0, p1):
+ubuntu_trimesh_fix = {}
+def intersect_with_line(obj, p0, p1):
     """
-    Return the list of points intersecting the mesh
+    Return the list of intersectin points for a ray that traverses the given mesh
     along the segment defined by two points `p0` and `p1`.
+    :param mesh: Trimesh mesh or vtkActor but in this case a (slow) conversion will occur
+    :param p0: Initial point
+    :param p1: Destination point
+    :returns: Hit locations
     """
-    if not actor.line_locator:
-        actor.line_locator = vtk.vtkOBBTree()
-        actor.line_locator.SetDataSet(actor.polydata())
-        actor.line_locator.BuildLocator()
+    # Go figure why: on Ubuntu (tested on LTS 20), a call to VTK's intersectWithLine yields a segfault.
+    from sys import platform as _platform
 
-    intersectPoints = vtk.vtkPoints()
-    actor.line_locator.IntersectWithLine(p0, p1, intersectPoints, None)
-    pts = []
-    for i in range(intersectPoints.GetNumberOfPoints()):
-        intersection = [0, 0, 0]
-        intersectPoints.GetPoint(i, intersection)
-        pts.append(intersection)
-    return pts
+    linux = _platform == "linux" or _platform == "linux2"
+    if linux:
+        trimesh_obj = ubuntu_trimesh_fix.get(obj)
+        if trimesh_obj is None:
+            trimesh_obj = vedo.utils.vedo2trimesh(obj)
+            ubuntu_trimesh_fix[obj] = trimesh_obj
+        obj = trimesh_obj
+        locations, index_ray, index_tri = obj.ray.intersects_location(ray_origins=[p0], ray_directions=[p1-p0])
+        return locations
+    elif isinstance(obj, trimesh.Trimesh):
+        locations, index_ray, index_tri = obj.ray.intersects_location(ray_origins=[p0], ray_directions=[p1-p0])
+        return locations
+    else:
+        if not obj.line_locator:
+            obj.line_locator = vtk.vtkOBBTree()
+            obj.line_locator.SetDataSet(obj.polydata())
+            obj.line_locator.BuildLocator()
+
+        intersections = vtk.vtkPoints()
+        result = obj.line_locator.IntersectWithLine(p0, p1, intersections, None)
+        points = [] 
+        for i in range(intersections.GetNumberOfPoints()):
+            intersection = [0, 0, 0]
+            intersections.GetPoint(i, intersection)
+            points.append(intersection)
+        return points
 
 
 def get_transformation_matrix(origin, normal):
