@@ -37,6 +37,7 @@ class CameraModel:
 
     focal_point: np.ndarray = np.array([0.0, 0.0, 0.0])
     target: Any = None
+    selection_point: Any = None
     visible: bool = True
 
     x_up: np.ndarray = np.array([1.0, 0.0, 0.0])

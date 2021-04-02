@@ -18,6 +18,7 @@ from iblviewer.volume_model import VolumeModel
 from iblviewer.slicer_model import SlicerModel
 
 from iblviewer.atlas_view import AtlasView
+from iblviewer.atlas_volume_view import AtlasVolumeView
 from iblviewer.volume_view import VolumeView
 from iblviewer.slicer_view import SlicerView
 import iblviewer.utils as utils
@@ -99,7 +100,7 @@ class AtlasController():
 
         self.view = AtlasView(self.plot, self.model)
         self.view.initialize()
-        self.view.volume = VolumeView(self.plot, self.model.volume, self.model)
+        self.view.volume = AtlasVolumeView(self.plot, self.model.volume, self.model)
         
         pn = SlicerModel.NAME_XYZ_POSITIVE
         nn = SlicerModel.NAME_XYZ_NEGATIVE
@@ -356,7 +357,7 @@ class AtlasController():
         self.model.transfer_function = self.model.next_transfer_function()
         self.handle_transfer_function_update()
 
-    def update_alpha_unit(self, widget=None, event=None, value=1.0):
+    def update_alpha_unit(self, widget=None, event=None, value=1.0, volume_click_threshold=4.0):
         """
         Update the alpha unit of the current volume
         :param widget: Widget instance (given by the event caller)
@@ -366,6 +367,7 @@ class AtlasController():
         if widget is not None and event is not None:
             value = widget.GetRepresentation().GetValue()
         self.view.volume.actor.alphaUnit(value)
+        self.view.volume.actor.pickable(value < volume_click_threshold)
 
     def toggle_atlas_visibility(self):
         """
@@ -504,13 +506,13 @@ class AtlasController():
         self.plot.interactor.GetInteractorStyle().EnabledOn()
         self.plot.interactor.GetInteractorStyle().On()
 
-        # 3. Handle double click case
         detla_norm_2d_click = np.linalg.norm(self.last_mouse_position - np.array(event.picked2d))
+        '''
+        # 3. Handle double click case
         if utils.time_diff(self.last_mouse_time) < 0.5 and detla_norm_2d_click < 4:
             # Double click/tap means we focus the camera on the selection
             #logging.info('Double-click at coordinate ' + str(event.picked3d))
-            self.model.camera.target = event.picked3d
-            self.update_camera()
+        '''
 
         self.last_mouse_time = datetime.now()
 
@@ -592,6 +594,7 @@ class AtlasController():
             return
         
         text += '\nPosition: ' + "{0:.2f}, {1:.2f}, {2:.2f}".format(*atlas_pick)
+        self.model.camera.selection_point = position
 
         #vig = vpt.vignette(txt, c='black', offset=(20,10)).followCamera()
         self.plot.remove(self.selection_point, render=False)
@@ -659,7 +662,7 @@ class AtlasController():
         ray_norm = ray / np.linalg.norm(ray)
         destination = destination + ray_norm * max_distance
 
-        positions = utils.intersect_with_line(self.view.volume.bounding_mesh, origin, destination)
+        positions = self.view.volume.bounding_mesh.intersectWithLine(origin, destination)
         
         distances = []
         for p_id in range(len(positions)):
@@ -682,7 +685,7 @@ class AtlasController():
         for slicer in self.slicers:
             if slicer.actor is None:
                 continue
-            position = utils.intersect_with_line(slicer.actor, origin, destination)
+            position = slicer.actor.intersectWithLine(origin, destination)
             if position is None or len(position) < 1:
                 continue
             # When intersecting with a plane, we should only have one point
@@ -805,6 +808,7 @@ class AtlasController():
         #self.axes_button = self.add_button(self.toggle_axes_visibility, pos=(0.05, 0.78), states=["Show axes", "Hide axes"], **tog_kw)
         self.add_button('slices_visibility', self.toggle_slices_visibility, pos=(0.05, 0.66), states=["Slices visible", "Slices hidden"], **tog_kw)
         self.add_button('info_visibility', self.toggle_info_visibility, pos=(0.05, 0.62), states=["Info visible", "Info hidden"], **tog_kw)
+        self.add_button('view_selected', self.view_selected, pos=(0.05, 0.58), states=["Focus on selection"], **btn_kw)
 
         
         s_kw = self.model.ui.slider_config
@@ -1022,7 +1026,7 @@ class AtlasController():
         camera.SetFocalPoint(*position)
         return camera
 
-    def update_camera(self, normal=None, view_up=None, scale_factor=1.5, min_distance=1000):
+    def update_camera(self, normal=None, view_up=None, scale_factor=1.5, min_distance=10000):
         """
         Update the camera frustrum
         :param normal: View normal
@@ -1127,6 +1131,16 @@ class AtlasController():
         Reset the camera target to the current atlas volume
         """
         self.model.camera.target = self.view.volume.actor
+        self.update_camera()
+
+    def view_selected(self, point=None):
+        """
+        Focus the camera on the current selection point
+        :param point: Point to focus on
+        """
+        if point is None:
+            point = self.model.camera.selection_point
+        self.model.camera.target = point
         self.update_camera()
 
     def animation_callback(self, progress):

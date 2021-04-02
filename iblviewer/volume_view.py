@@ -23,7 +23,6 @@ class VolumeView():
         self.atlas_model = atlas_model
 
         self.actor = None
-        self.surface_actor = None
         self.bounding_mesh = None
         self.alpha_factor = 0.001 #* self.model.volume.resolution
 
@@ -210,24 +209,6 @@ class VolumeView():
         if label is not None:
             isosurface.color(self.atlas_model.get_region_color(label))
         return isosurface
-
-    def build_surface_mesh(self, region=None):
-        """
-        Build a surface mesh with marching cubes algorithm
-        """
-        if not self.model.is_segmented_volume():
-            #logging.error('[VolumeView.build_surface_mesh()] cannot work without the segmented Allen volume')
-            return
-
-        self.bounding_mesh = utils.load_surface_mesh('997')
-        #mesh = vedo.utils.vedo2trimesh(actor)
-        '''
-        self.surface_actor.alpha(0)
-        self.surface_actor.name = self.model.name + '_surface'
-        self.surface_actor.mapper().SetClippingPlanes(self.clipping_planes)
-        self.surface_actor.pickable(0)
-        #self.surface_actor.ForceOpaqueOn()
-        '''
 
     def set_interactive_subsampling(self, on=False):
         """

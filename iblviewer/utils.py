@@ -281,7 +281,7 @@ def get_surface_mesh_path(file_name, meshes_path=None, extension='ply'):
     if meshes_path is None:
         region_mesh_path = str(get_local_data_file_path(file_name, extension))
         if not os.path.exists(region_mesh_path):
-            region_mesh_path = 'https://github.com/int-brain-lab/iblviewer/blob/main/data/surfaces/'
+            region_mesh_path = 'https://raw.github.com/int-brain-lab/iblviewer/main/data/surfaces/'
             region_mesh_path += get_file_name(file_name, extension)
     else:
         region_mesh_path = str(os.path.join(meshes_path, get_file_name(file_name, extension)))
@@ -371,47 +371,6 @@ def get_actor_dimensions(actor):
             return np.array([xmax - xmin, ymax - ymin, zmax - zmin])
     except Exception as e:
         raise e
-
-
-ubuntu_trimesh_fix = {}
-def intersect_with_line(obj, p0, p1):
-    """
-    Return the list of intersectin points for a ray that traverses the given mesh
-    along the segment defined by two points `p0` and `p1`.
-    :param mesh: Trimesh mesh or vtkActor but in this case a (slow) conversion will occur
-    :param p0: Initial point
-    :param p1: Destination point
-    :returns: Hit locations
-    """
-    # Go figure why: on Ubuntu (tested on LTS 20), a call to VTK's intersectWithLine yields a segfault.
-    from sys import platform as _platform
-
-    linux = _platform == "linux" or _platform == "linux2"
-    if linux:
-        trimesh_obj = ubuntu_trimesh_fix.get(obj)
-        if trimesh_obj is None:
-            trimesh_obj = vedo.utils.vedo2trimesh(obj)
-            ubuntu_trimesh_fix[obj] = trimesh_obj
-        obj = trimesh_obj
-        locations, index_ray, index_tri = obj.ray.intersects_location(ray_origins=[p0], ray_directions=[p1-p0])
-        return locations
-    elif isinstance(obj, trimesh.Trimesh):
-        locations, index_ray, index_tri = obj.ray.intersects_location(ray_origins=[p0], ray_directions=[p1-p0])
-        return locations
-    else:
-        if not obj.line_locator:
-            obj.line_locator = vtk.vtkOBBTree()
-            obj.line_locator.SetDataSet(obj.polydata())
-            obj.line_locator.BuildLocator()
-
-        intersections = vtk.vtkPoints()
-        result = obj.line_locator.IntersectWithLine(p0, p1, intersections, None)
-        points = [] 
-        for i in range(intersections.GetNumberOfPoints()):
-            intersection = [0, 0, 0]
-            intersections.GetPoint(i, intersection)
-            points.append(intersection)
-        return points
 
 
 def get_transformation_matrix(origin, normal):
