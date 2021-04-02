@@ -75,8 +75,11 @@ Have a look at the examples folder which contains several cases for loading dyna
 ## Issues and feature request
 Feel free to request features and raise issues.
 
+## Author
+Nicolas Antille, International Brain Laboratory, 2021
+
 ## Special thanks
 Thanks Marco Musy and Federico Claudi for their support in using vedo. Check out the tool that Federico made, called brainrender, a tool that leverages surface rendering to create great scientific visualizations and figures.
 From International Brain Laboratory:
 Thanks professor Alexandre Pouget, Berk Gerçek, Leenoy Meshulam and Alessandro Santos for their constructive feedbacks and guidance.
-Thanks Olivier Winter and Shan Shen for their support on the back-end side.
+Thanks Olivier Winter, Gaelle Chapuis and Shan Shen for their support on the back-end side.

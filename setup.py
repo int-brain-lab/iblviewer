@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'iblviewer', 
-    version='1.0.1',   
-    description='A example Python package',
+    version='1.0.2',   
+    description='An interactive GPU-accelerated neuroscience viewer based on VTK that works with Jupyter Notebooks for the International Brain Laboratory.',
     url='https://github.com/int-brain-lab/iblviewer',
     author='Nicolas Antille',
     author_email='nicolas.antille@gmail.com',
