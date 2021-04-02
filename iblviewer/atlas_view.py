@@ -77,67 +77,60 @@ class AtlasView():
         settings.useFXAA = True
         settings.multiSamples = 0
 
-    def new_segments(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+    def new_segments(self, start_points, end_points=None, line_width=2, relative_end_points=False, 
+    spherical_angles=None, radians=True, values=None, use_origin=True, trim_outliers=True, add_to_scene=False):
         """
         [Please use add_segments instead of new_segments]
         """
-        return self.add_segments(start_points, end_points, line_width, spherical_angles, radians, values, use_origin, relative_end_points, add_to_scene)
+        return self.add_segments(start_points, end_points, line_width, relative_end_points, spherical_angles, radians, values, use_origin, trim_outliers, add_to_scene)
 
-    def add_segments(self, start_points, end_points=None, line_width=2, spherical_angles=None, radians=True, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+    def add_segments(self, start_points, end_points=None, line_width=2, relative_end_points=False, 
+    spherical_angles=None, radians=True, values=None, use_origin=True, trim_outliers=True, add_to_scene=False):
         """
         Add a set of segments
         :param start_points: 3D numpy array of points of length n
         :param end_points: 3D numpy array of points of length n
         :param line_width: Line width, defaults to 2px
+        :param relative_end_points: Whether the given end point is relative to the start point. False by default,
+        except is spherical coordinates are given
         :param spherical_angles: 3D numpy array of spherical angle data of length n 
         In case end_points is None, this replaces end_points by finding the relative
         coordinate to each start point with the given radius/depth, theta and phi
-        :param values: 1D list of length n, for one scalar value per line
         :param radians: Whether the given spherical angle data is in radians or in degrees
+        :param values: 1D list of length n, for one scalar value per line
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
-        :param relative_end_points: Whether the given end point is relative to the start point. False by default,
-        except is spherical coordinates are given
+        :param trim_outliers: Whether segments that are out of the brain envelope are trimmed or not. True by default
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :return: Lines
-        """        
+        """
         if end_points is None and spherical_angles is not None:
             relative_end_points = True
             spherical_angles = np.array(spherical_angles)
-            print('num spherical angles', len(spherical_angles))
             if radians:
                 end_points = spherical_angles.apply(vedo.spher2cart)
             else:
                 end_points = spherical_angles.apply(utils.spherical_degree_angles_to_xyz)
         elif end_points is None:
-            # We assume start_points are segments
+            # We assume start_points are segments (arrays of two 3d arrays)
+            end_points = start_points[:, -1]
             start_points = start_points[:, 0]
-            end_points = start_points[:, 1]
         elif end_points is not None and len(start_points) != len(end_points):
             logging.error('Mismatch between start and end points length. Fix your data and call add_lines() again.')
             return
         
         if relative_end_points:
             end_points += start_points
-        
-        #distances = np.linalg.norm(end_points - start_points)
-        # Lines is a single object. It's the same principle as grouping particles into one object
-        lines = vedo.Lines(start_points, end_points)#.cmap('Accent', distances, on='cells')
-        #lines.addCellArray(values, 'scalars')
-        lines.lw(line_width)
-        lines.lighting(0)
-        lines.pickable(True)
-        lines.name = AtlasModel.LINES_PREFIX
-        if add_to_scene:
-            self.plot.add(lines)
-        return lines
 
-    def new_lines(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+        point_sets = np.c_[start_points, end_points].reshape(-1, 2, 3)
+        return self.add_lines(point_sets, line_width, values, use_origin, trim_outliers, add_to_scene)
+
+    def new_lines(self, point_sets, line_width=2, values=None, use_origin=True, trim_outliers=True, add_to_scene=False):
         """
         [Please use add_lines instead of new_lines]
         """
-        return self.add_lines(point_sets, line_width, values, use_origin, relative_end_points, add_to_scene)
+        return self.add_lines(point_sets, line_width, values, use_origin, trim_outliers, add_to_scene)
 
-    def add_lines(self, point_sets, line_width=2, values=None, use_origin=True, relative_end_points=False, add_to_scene=False):
+    def add_lines(self, point_sets, line_width=2, values=None, use_origin=True, trim_outliers=True, add_to_scene=False):
         """
         Create a set of lines with given point sets
         :param point_sets: List of lists of 3D coordinates
@@ -148,8 +141,7 @@ class AtlasView():
         :param values: 1D list of length n, for one scalar value per line
         :param radians: Whether the given spherical angle data is in radians or in degrees
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
-        :param relative_end_points: Whether the given end point is relative to the start point. False by default,
-        except is spherical coordinates are given
+        :param trim_outliers: Whether segments that are out of the brain envelope are trimmed or not. True by default
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :return: Lines
         """
@@ -177,6 +169,9 @@ class AtlasView():
         lines.pickable(True)
         lines.lw(line_width)
         lines.name = AtlasModel.LINES_PREFIX
+
+        if trim_outliers and self.volume.bounding_mesh is not None:
+            lines.cutWithMesh(self.volume.bounding_mesh)
         if add_to_scene:
             self.plot.add(lines)
         return lines
