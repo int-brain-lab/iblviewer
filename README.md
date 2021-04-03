@@ -30,16 +30,16 @@ pip install vtk
 This will uninstall vtk and reinstall it (version 9+) with pip.
 
 ## Updating
-If you have installed IBLViewer (see below) and you want an update, run the below command:
+If you have installed IBLViewer (see below) and you to update to the latest version, run:
 ```bash
-pip install -U git+https://github.com/int-brain-lab/ibllib.git@develop
+pip install -U git+https://github.com/int-brain-lab/iblviewer.git
 ```
 This works on conda environments as well.
 
 In rare cases like observed on Windows once, updating fails and the user doesn't know about it. Reinstall iblviewer:
 ```bash
 pip uninstall iblviewer
-pip install git+https://github.com/int-brain-lab/ibllib.git@develop
+pip install git+https://github.com/int-brain-lab/iblviewer.git
 ```
 
 ## Examples
