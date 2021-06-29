@@ -1,7 +1,8 @@
-# DEMO 1: add insertion probes data from IBL database (DataJoints)
-from iblviewer import atlas_controller
+# DEMO: add insertion probes data from IBL database (DataJoints)
 import oneibl.one
 import numpy as np
+
+from iblviewer.mouse_brain import MouseBrainViewer
 
 
 def get_bwm_ins_alyx(one):
@@ -24,18 +25,17 @@ def get_bwm_ins_alyx(one):
                                'json__extended_qc__alignment_count__gt,0,'
                                'session__extended_qc__behavior,1')
     
-    ins_id = [item['id'] for item in ins]
+    ins_ids = [item['id'] for item in ins]
     sess_id = [item['session_info']['id'] for item in ins]
     # Here's what's in 'json':
     # dict_keys(['qc', 'n_units', 'xyz_picks', 'extended_qc', 'drift_rms_um', 'firing_rate_max', 'n_units_qc_pass', 
     # 'amplitude_max_uV', 'firing_rate_median', 'amplitude_median_uV', 'whitening_matrix_conditioning'])
-    xyz_picks = {}
+    positions = []
     for item in ins:
-        ins_id = item['id']
-        picks = np.array(item['json'].get('xyz_picks', []))
-        xyz_picks[ins_id] = picks
+        picks = item['json'].get('xyz_picks', [])
+        positions.append(picks)
     sess_id = np.unique(sess_id)
-    return xyz_picks
+    return positions, ins_ids
 
 
 def get_picks_mean_vectors(xyz_picks, extent=3):
@@ -43,45 +43,47 @@ def get_picks_mean_vectors(xyz_picks, extent=3):
     Get a mean vector from picks coordinates
     :param xyz_picks: Dictionary xyz picks, the key being the identifier for that data set
     :param extent: Number of points to take from start and end for mean computation of end points
-    :return: 3D numpy array and a list of ids
+    :return: List of varying lists of 3D points and a list of line ids
     """
     vectors = []
     ids = []
     # Mean between first and last three picks
-    for ins_id in xyz_picks:
+    for ins_id in range(len(xyz_picks)):
         raw_picks = xyz_picks[ins_id]
         end_pt = np.mean(raw_picks[-extent:], axis=0)
         start_pt = np.mean(raw_picks[:extent], axis=0)
         vectors.append([start_pt, end_pt])
         ids.append(ins_id)
-    return np.array(vectors), ids
+    return vectors, ids
 
 
-def add_insertion_probes(controller, one_connection, reduced=True, line_width=2):
+def add_insertion_probes(viewer, one_connection, reduced=False, line_width=2, trim_outliers=True):
     """
     Add insertion probe vectors
-    :param controller: The IBLViewer controller
+    :param viewer: The IBLViewer controller
     :param one_connection: The "one" connection to IBL server
     :param reduced: Whether insertion probes should be reduced to simple lines
+    :param trim_outliers: Whether you want the lines to be cut when they're out of the brain
     :param with_labels: Whether labels should be added to the lines
     """
-    vectors = get_bwm_ins_alyx(one_connection)
+    lines_data, line_ids = get_bwm_ins_alyx(one_connection)
     if reduced:
-        vectors, ids = get_picks_mean_vectors(vectors)
-        lines = controller.view.add_segments(vectors, line_width=line_width)
+        segments_data, segment_ids = get_picks_mean_vectors(lines_data)
+        line_ids = np.array(line_ids)
+        segment_ids = line_ids[segment_ids]
+        print(segments_data[0])
+        lines = viewer.add_segments(segments_data, line_width=line_width, 
+                                    add_to_scene=True, trim_outliers=trim_outliers)
     else:
-        lines = controller.view.add_lines(vectors, line_width=line_width)
-    actors = [lines]
-
-    controller.plot.add(actors)
+        lines = viewer.add_lines(lines_data, line_width=line_width,
+                                add_to_scene=True, trim_outliers=trim_outliers)
     return lines
 
 
 if __name__ == '__main__':
 
     one_connection = oneibl.one.ONE(base_url="https://alyx.internationalbrainlab.org")
-    controller = atlas_controller.AtlasController()
-    controller.initialize(resolution=25, mapping='Allen', embed_ui=True, jupyter=False)
-
-    add_insertion_probes(controller, one_connection, reduced=False)
-    controller.render()
+    viewer = MouseBrainViewer()
+    viewer.initialize(resolution=25, embed_ui=True)
+    add_insertion_probes(viewer, one_connection, reduced=True, line_width=5)
+    viewer.show()

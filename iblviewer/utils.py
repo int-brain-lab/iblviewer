@@ -1,170 +1,61 @@
 from datetime import datetime
 import numpy as np
 import os
+import glob
 from pathlib import Path
 
-from vtk.util.numpy_support import numpy_to_vtk
+from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy, numpy_to_vtkIdTypeArray
 import vtk
 import vedo
 import math
-import trimesh
+#import trimesh
 
 
 ROOT_FOLDER = Path(__file__).parent.parent
-DATA_FOLDER = ROOT_FOLDER.joinpath('./data')
+ASSETS_FOLDER = ROOT_FOLDER.joinpath('./assets')
 EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./examples')
 EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./examples/data')
 
 
-def Cross3DExt(pos=(0,0,0), size=1.0, thickness=0.25, color="b", alpha=1, res=4, lines_mode=True):
+def get_type(element):
     """
-    Build a 3D cross shape, mainly useful as a 3D marker.
+    Get the type of object as a string
+    :return: String
     """
-    if lines_mode:
-        x1 = np.array([1.0, 0.0, 0.0]) * size / 2
-        x2 = np.array([-1.0, 0.0, 0.0]) * size / 2
-        c1 = vedo.Line(x1, x2, lw=thickness)
+    return str(element.__class__.__name__).lower()
+    
 
-        y1 = np.array([0.0, 1.0, 0.0]) * size / 2
-        y2 = np.array([0.0, -1.0, 0.0]) * size / 2
-        c2 = vedo.Line(y1, y2, lw=thickness)
+def numpy2vtk(arr, dtype=None, deep=True, name=""):
+    """
+    Convert a numpy array into a vtkDataArray
+    :param arr: Array
+    :param dtype: Data type. Allows to set a specific data type to the VTK array
+    :param deep: Whether a deep copy is made. Defaults to True
+    :param name: Name of the array
+    """
+    if arr is None:
+        return None
+    arr = np.ascontiguousarray(arr)
+    if dtype is not None and dtype!='id':
+        arr = arr.astype(dtype)
 
-        z1 = np.array([0.0, 0.0, 1.0]) * size / 2
-        z2 = np.array([0.0, 0.0, -1.0]) * size / 2
-        c3 = vedo.Line(z1, z2, lw=thickness)
+    if dtype and dtype=='id':
+        varr = numpy_to_vtkIdTypeArray(arr.astype(np.int64), deep=deep)
     else:
-        c1 = vedo.Cylinder(r=thickness, height=size, res=res)
-        c2 = vedo.Cylinder(r=thickness, height=size, res=res).rotateX(90)
-        c3 = vedo.Cylinder(r=thickness, height=size, res=res).rotateY(90)
-    cross = vedo.merge(c1,c2,c3).color(color).alpha(alpha)
-    cross.SetPosition(pos)
-    cross.name = "[Marker]"
-    return cross
-
-
-class LinesExt(vedo.Line):
-    """
-    Improved Lines class from vedo. 
-    This one accepts point sets of varying lengths
-    """
-    def __init__(self, point_sets, c='gray', alpha=1, lw=1, dotted=False):
-        
-        polylns = vtk.vtkAppendPolyData()
-        for point_set in point_sets:
-            # This part taken from class Line, which accepts n points
-            ppoints = vtk.vtkPoints()  # Generate the polyline
-            ppoints.SetData(numpy_to_vtk(np.ascontiguousarray(point_set), deep=True))
-            lines = vtk.vtkCellArray()
-            npt = len(point_set)
-            lines.InsertNextCell(npt)
-            for i in range(npt):
-                lines.InsertCellPoint(i)
-            poly = vtk.vtkPolyData()
-            poly.SetPoints(ppoints)
-            poly.SetLines(lines)
-            polylns.AddInputData(poly)
-        polylns.Update()
-
-        vedo.Mesh.__init__(self, polylns.GetOutput(), c, alpha)
-        self.lw(lw).lighting('off')
-        if dotted:
-            self.GetProperty().SetLineStipplePattern(0xF0F0)
-            self.GetProperty().SetLineStippleRepeatFactor(1)
-        self.name = "[Lines]"
-
-
-class SpheresExt(vedo.Mesh):
-    """
-    Build a set of spheres at `centers` of radius `r`.
-    Either `c` or `r` can be a list of RGB colors or radii.
-    """
-    def __init__(self, centers, r=1, c="r", alpha=1, res=8):
-
-        if isinstance(centers, vedo.Points):
-            centers = centers.points()
-
-        cisseq = False
-        if vedo.utils.isSequence(c):
-            cisseq = True
-
-        if cisseq:
-            if len(centers) > len(c):
-                vedo.printc("\times Mismatch in Spheres() colors", len(centers), len(c), c='r')
-                raise RuntimeError()
-            if len(centers) != len(c):
-                vedo.printc("\lightningWarning: mismatch in Spheres() colors", len(centers), len(c))
-
-        risseq = False
-        if vedo.utils.isSequence(r):
-            risseq = True
-
-        if risseq:
-            if len(centers) > len(r):
-                vedo.printc("times Mismatch in Spheres() radius", len(centers), len(r), c='r')
-                raise RuntimeError()
-            if len(centers) != len(r):
-                vedo.printc("\lightning Warning: mismatch in Spheres() radius", len(centers), len(r))
-        if cisseq and risseq:
-            vedo.printc("\noentry Limitation: c and r cannot be both sequences.", c='r')
-            raise RuntimeError()
-
-        src = vtk.vtkSphereSource()
-        if not risseq:
-            src.SetRadius(r)
-        if vedo.utils.isSequence(res):
-            res_t, res_phi = res
-        else:
-            res_t, res_phi = 2*res, res
-
-        src.SetThetaResolution(res_t)
-        src.SetPhiResolution(res_phi)
-        src.Update()
-
-        psrc = vtk.vtkPointSource()
-        psrc.SetNumberOfPoints(len(centers))
-        psrc.Update()
-        pd = psrc.GetOutput()
-        vpts = pd.GetPoints()
-
-        glyph = vtk.vtkGlyph3D()
-        glyph.SetSourceConnection(src.GetOutputPort())
-
-        if cisseq:
-            glyph.SetColorModeToColorByScalar()
-            ucols = vtk.vtkUnsignedCharArray()
-            ucols.SetNumberOfComponents(3)
-            ucols.SetName("colors")
-            #for i, p in enumerate(centers):
-            for cx, cy, cz in c:
-                #cx, cy, cz = getColor(acol)
-                ucols.InsertNextTuple3(cx * 255, cy * 255, cz * 255)
-            pd.GetPointData().SetScalars(ucols)
-            glyph.ScalingOff()
-        elif risseq:
-            glyph.SetScaleModeToScaleByScalar()
-            urads = numpy_to_vtk(np.ascontiguousarray(2*r).astype(float), deep=True)
-            urads.SetName("radii")
-            pd.GetPointData().SetScalars(urads)
-
-        vpts.SetData(numpy_to_vtk(np.ascontiguousarray(centers), deep=True))
-
-        glyph.SetInputData(pd)
-        glyph.Update()
-
-        vedo.Mesh.__init__(self, glyph.GetOutput(), alpha=alpha)
-        self.phong()
-
-        self._polydata = pd
-
-        if cisseq:
-            self.mapper().ScalarVisibilityOn()
-        else:
-            self.mapper().ScalarVisibilityOff()
-            self.GetProperty().SetColor(vedo.getColor(c))
-        self.name = "[Spheres]"
+        varr = numpy_to_vtk(arr, deep=deep)
+    if name:
+        varr.SetName(name)
+    return varr
 
 
 def spherical_degree_angles_to_xyz(radius, theta, phi):
+    """
+    Convert spherical degree angles to XYZ coordinates
+    :param radius: Radius
+    :param theta: Theta angle value in degrees
+    :param phi: Phi angle value in degrees
+    :return: List of 3 coordinates
+    """
     return vedo.spher2cart(radius, theta / 180 * math.pi, phi / 180 * math.pi) 
 
 
@@ -209,13 +100,17 @@ def add_callback(plot, event_name, func, priority=0.0):
         xp, yp = plot.interactor.GetLastEventPosition()
         actor = plot.picker.GetProp3D()
         delta3d = np.array([0,0,0])
-        if actor:
+        picked3d = None
+        if actor is not None:
             picked3d = np.array(plot.picker.GetPickPosition())
-            if actor.picked3d is not None:
-                delta3d = picked3d - actor.picked3d
-            actor.picked3d = picked3d
+            try:
+                if actor.picked3d is not None:
+                    delta3d = picked3d - actor.picked3d
+                actor.picked3d = picked3d
+            except AttributeError:
+                return
         else:
-            picked3d = None
+            actor = plot.picker.GetActor2D()
 
         dx, dy = x-xp, y-yp
 
@@ -238,6 +133,7 @@ def add_callback(plot, event_name, func, priority=0.0):
             "isAssembly": isinstance(actor, vedo.Assembly),
             "isVolume":   isinstance(actor, vedo.Volume),
             "isPicture":  isinstance(actor, vedo.Picture),
+            "isActor2D":  isinstance(actor, vtk.vtkActor2D)
         })
         func(event_dict)
         return
@@ -260,28 +156,32 @@ def get_file_name(file_name, extension):
     return full_file_name
 
 
-def get_local_data_file_path(file_name, extension):
+def get_local_data_file_path(file_name, extension, sub_folder=''):
     """
     Get data path
     :param file_name: File name without extension
     :param extension: File extension
     :return: File path
     """
-    return DATA_FOLDER.joinpath('./surfaces/' + get_file_name(file_name, extension))
+    return ASSETS_FOLDER.joinpath(sub_folder, get_file_name(file_name, extension))
 
 
-def get_surface_mesh_path(file_name, meshes_path=None, extension='ply'):
+def get_surface_mesh_path(file_name, meshes_path=None, extension='ply', default_meshes_path=None):
     """
     Get a surface mesh file path
     :param file_name: File name without extension
     :param meshes_path: Folder path. If None given, this method will look into the data folder of iblviewer
     :param extension: File extension
-    :return: Full mesh file path.
+    :param default_meshes_path: Fallback local or remote path
+    :return: Full mesh file path
     """
     if meshes_path is None:
-        region_mesh_path = str(get_local_data_file_path(file_name, extension))
+        region_mesh_path = str(get_local_data_file_path(file_name, extension, 'surfaces'))
         if not os.path.exists(region_mesh_path):
-            region_mesh_path = 'https://raw.github.com/int-brain-lab/iblviewer/main/data/surfaces/'
+            if default_meshes_path is not None:
+                region_mesh_path = default_meshes_path
+            else:
+                region_mesh_path = 'https://raw.github.com/int-brain-lab/iblviewer/main/assets/surfaces/'
             region_mesh_path += get_file_name(file_name, extension)
     else:
         region_mesh_path = str(os.path.join(meshes_path, get_file_name(file_name, extension)))
@@ -363,6 +263,8 @@ def get_actor_dimensions(actor):
     :param actor: VTK actor
     :return: 3d array
     """
+    if actor is None:
+        return
     try:
         if isinstance(actor, vedo.Volume):
             return actor.dimensions() * actor.spacing()# equivalent to self.model.resolution
@@ -371,6 +273,32 @@ def get_actor_dimensions(actor):
             return np.array([xmax - xmin, ymax - ymin, zmax - zmin])
     except Exception as e:
         raise e
+
+
+def get_bounding_planes(actor):
+    """
+    Get bounding planes for an actor
+    :param actor: VTK actor
+    :return: vtkPlanes
+    """
+    planes = vtk.vtkPlanes()
+    planes.SetBounds(actor.GetBounds())
+    return planes
+
+
+def get_planes_bounds(planes):
+    """
+    Get the bounding box of a series of planes
+    :param planes: vtkPlaneCollection
+    :return: 6 values
+    """
+    origins = list()
+    for p_id in range(planes.GetNumberOfItems()):
+        origins.append(planes.GetItem(p_id).GetOrigin())
+    origins = np.array(origins)
+    mn = np.min(origins, axis=0).tolist()
+    mx = np.max(origins, axis=0).tolist()
+    return mn[0], mx[0], mn[1], mx[1], mn[2], mx[2] 
 
 
 def get_transformation_matrix(origin, normal):
@@ -392,18 +320,108 @@ def get_transformation_matrix(origin, normal):
     return M, T
 
 
+def box_cutter(plot, target, interaction_callback=None, place_factor=1, 
+                handle_size=0.005, outline_color=None):
+    """
+    Initializes a boxWidget that will cut the volume.
+    :param plot: vtk plot
+    :param target: Target object
+    :param interaction_callback: Function that will be called every
+    time there is an interaction with the widget. That's where
+    you set the clipping planes to the object for instance
+    :param place_factor: see vtkBoxWidget.setPlaceFactor()
+    :param handle_size: set the relative handle size, see vtkBoxWidget.SetHandleSize()
+    :return: Widget. Note that this function returns the Widget
+    only when you are done interacting with it if start param is True
+    """
+    widget = vtk.vtkBoxWidget()
+    widget.SetInteractor(plot.interactor)
+    widget.SetPlaceFactor(place_factor)
+    widget.SetHandleSize(handle_size)
+    # TODO: handle the update event in volumes in order to choose
+    # the best method, either axis-aligned slicing in case normals
+    # are axis-aligned, or using vtkImageReslice. Everything is coded
+    # in VolumeView already.
+    widget.RotationEnabledOff()
+    widget.SetInputData(target.inputdata())
+    plot.cutterWidget = widget
+    
+    # Only valid for vtkBoxWidget
+    widget.OutlineCursorWiresOn()
+    widget.InsideOutOn()
+    widget.GetSelectedOutlineProperty().SetColor(1, 0, 1)
+    if outline_color is None:
+        outline_color = [0.5, 0.5, 0.5]
+    widget.GetOutlineProperty().SetColor(*outline_color)
+    #widget.GetOutlineProperty().SetOpacity(0.7)
+
+    #widget.SetRepresentationToOutline()
+    existing_planes = target.mapper().GetClippingPlanes()
+    if existing_planes is not None:
+        bounds = get_planes_bounds(existing_planes)
+        widget.PlaceWidget(bounds)
+    else:
+        widget.PlaceWidget(target.GetBounds())
+    
+    def clip_target(widget=None, event=None):
+        """
+        Clip the target with the current box widget
+        """
+        if widget is None:
+            return
+        clipping_planes = vtk.vtkPlanes()
+        widget.GetPlanes(clipping_planes)
+        target.mapper().SetClippingPlanes(clipping_planes)
+
+    if interaction_callback is None:
+        interaction_callback = clip_target
+    
+    widget.AddObserver("InteractionEvent", interaction_callback)
+    plot.interactor.Render()
+    widget.On()
+    plot.widgets.append(widget)
+    return widget
+
+
+def update_scalar_bar(sb, lut, useAlpha=False):
+    """
+    Update a scalar bar with a new LUT
+    :param sb: vtkScalarBarActor
+    :param lut: vtkLookupTable
+    :param useAlpha: whether alpha is used in the scalar bar
+    """
+    if sb.GetLookupTable() == lut:
+        return
+    sb.SetLookupTable(lut)
+    sb.SetUseOpacity(useAlpha)
+    sb.SetDrawFrame(0)
+    sb.SetDrawBackground(0)
+    if lut.GetUseBelowRangeColor():
+        sb.DrawBelowRangeSwatchOn()
+        sb.SetBelowRangeAnnotation('')
+    if lut.GetUseAboveRangeColor():
+        sb.DrawAboveRangeSwatchOn()
+        sb.SetAboveRangeAnnotation('')
+    if lut.GetNanColor() != (0.5, 0.0, 0.0, 1.0):
+        sb.DrawNanAnnotationOn()
+        sb.SetNanAnnotation('nan')
+
+
 def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYOffset=15, titleFontSize=12,
                     size=(None,None), nlabels=None, horizontal=False, useAlpha=False):
     """
-    Add a 2D scalar bar for the specified obj. Modified method from vedo.addons.addScalarBar
+    Create a new 2D scalar bar. This is a modified method from vedo.addons.addScalarBar
+    :param lut: Color map LUT
     :param list pos: fractional x and y position in the 2D window
     :param list size: size of the scalarbar in pixel units (width, heigth)
     :param int nlabels: number of numeric labels to be shown
     :param bool useAlpha: retain trasparency in scalarbar
     :param bool horizontal: show in horizontal layout
     """
+    if isinstance(font_color, str):
+        font_color = vedo.getColor(font_color)
     sb = vtk.vtkScalarBarActor()
-    #sb.SetLabelFormat('%-#6.3g')
+    sb.SetLabelFormat('%-#6.4g')
     #print(sb.GetLabelFormat())
     sb.SetLookupTable(lut)
     sb.SetUseOpacity(useAlpha)
