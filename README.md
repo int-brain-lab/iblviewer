@@ -39,13 +39,13 @@ pip install git+https://github.com/int-brain-lab/iblviewer.git
 
 ## Examples
 Insertion probes, or how to display lines made of an heterogeneous amounf of points.
-![Demo 1](preview/insertion_probes.gif?raw=true)
+![Demo 1](examples/neuroscience/ibl_brain_wide_map.py)
 
 Time series of values assigned to brain regions
-![Demo 2](preview/volume_scalars.gif?raw=true)
+![Demo 2](examples/neuroscience/ibl_brain_wide_map.py)
 
 Point neurons and connectivity data
-![Demo 3](preview/point_neurons.gif?raw=true)
+![Demo 3](examples/neuroscience/point_neurons.py)
 
 ## Architecture
 This application relies on the well-known pattern MVC (Model-View-Controller).

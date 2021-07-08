@@ -1,4 +1,4 @@
-from oneibl.one import ONE
+from one.api import ONE
 import os
 import pickle
 import numpy as np
