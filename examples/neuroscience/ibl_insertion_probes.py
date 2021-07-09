@@ -1,5 +1,5 @@
 # DEMO: add insertion probes data from IBL database (DataJoints)
-import oneibl.one
+from one.api import ONE
 import numpy as np
 
 from iblviewer.mouse_brain import MouseBrainViewer
@@ -81,7 +81,7 @@ def add_insertion_probes(viewer, one_connection, as_segments=False, line_width=2
 
 if __name__ == '__main__':
 
-    one_connection = oneibl.one.ONE(base_url="https://alyx.internationalbrainlab.org")
+    one_connection = ONE(base_url="https://alyx.internationalbrainlab.org")
     viewer = MouseBrainViewer()
     viewer.initialize(resolution=25, embed_ui=True)
     add_insertion_probes(viewer, one_connection, as_segments=False, line_width=5)
