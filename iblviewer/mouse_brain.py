@@ -456,7 +456,8 @@ class MouseBrainViewer(Viewer):
         """
         if isinstance(self.atlas_controller, VolumeController):
             return
-        self.atlas_controller = VolumeController(self.plot, self.ibl_model.atlas_volume, center_on_edges=True)
+        self.atlas_controller = VolumeController(self.plot, self.ibl_model.atlas_volume, 
+                                                alpha_unit_upper_offset=0.1, center_on_edges=True)
         self.register_controller(self.atlas_controller, self.atlas_controller.get_related_actors())
 
     def add_atlas_dwi(self, color_map, alpha_map):
@@ -467,7 +468,8 @@ class MouseBrainViewer(Viewer):
         """
         if isinstance(self.dwi_controller, VolumeController):
             return
-        self.dwi_controller = VolumeController(self.plot, self.ibl_model.dwi_volume, center_on_edges=True)
+        self.dwi_controller = VolumeController(self.plot, self.ibl_model.dwi_volume, 
+                                                center_on_edges=True)
         self.dwi_controller.set_color_map(color_map, alpha_map)
         self.register_controller(self.dwi_controller, self.dwi_controller.get_related_actors())    
 
@@ -535,7 +537,8 @@ class MouseBrainViewer(Viewer):
         return point_cloud
 
     def add_points(self, positions, radius=10, values=None, color_map='Accent', name='Points', screen_space=False,
-                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, bounding_mesh=None, **kwargs):
+                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, bounding_mesh=None, 
+                    ibl_flip_yz=True, **kwargs):
         """
         Add new points as circles or spheres
         :param positions: 3D array of coordinates
@@ -557,13 +560,14 @@ class MouseBrainViewer(Viewer):
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param bounding_mesh: A closed manifold surface mesh used for trimming segments. If None,
         the current self.bounding_mesh is used (if it exists)
-        :return: Either Points or Spheres, depending on as_sphere param
+        :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
+        on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+        :return: objects.Points
         """
-        # Specific to IBL and Allen atlas, but do we want to keep this or actually flip the brain on Y and Z?
-        positions = np.array(positions) * [[1, -1, -1]]
+        if ibl_flip_yz:
+            positions = np.array(positions) * [[1, -1, -1]]
         if noise_amount is not None:
             positions += np.random.rand(len(positions), 3) * noise_amount
-
         link = True if add_to_scene and not trim_outliers else False
         points = super().add_points(positions, radius, values, color_map, name, screen_space, use_origin, link, **kwargs)
         if bounding_mesh is None:
@@ -575,12 +579,13 @@ class MouseBrainViewer(Viewer):
                 self.plot.add(points)
         return points
 
-    def add_segments(self, start_points, end_points=None, line_width=2, values=None, color_map='Accent', 
+    def add_segments(self, points, end_points=None, line_width=2, values=None, color_map='Accent', 
                     name='Segments', use_origin=True, add_to_scene=True, relative_end_points=False, 
-                    spherical_angles=None, radians=True, trim_outliers=True, bounding_mesh=None):
+                    spherical_angles=None, radians=True, trim_outliers=True, bounding_mesh=None, 
+                    ibl_flip_yz=True):
         """
         Add a set of segments
-        :param start_points: 3D numpy array of points of length n
+        :param points: 3D numpy array of points of length n
         :param end_points: 3D numpy array of points of length n
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
@@ -598,12 +603,17 @@ class MouseBrainViewer(Viewer):
         :param trim_outliers: Whether segments are cropped by the bounding mesh
         :param bounding_mesh: A closed manifold surface mesh used for trimming segments. If None,
         the current self.bounding_mesh is used (if it exists)
-        :return: Lines
+        :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
+        on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+        :return: objects.Lines
         """
+        if ibl_flip_yz:
+            points = np.array(points) * [[1, -1, -1]]
+            if end_points is not None:
+                end_points = np.array(end_points) * [[1, -1, -1]]
         pre_add = True if add_to_scene and not trim_outliers else False
-        lines = super().add_segments(start_points, end_points, line_width, values, color_map, name, use_origin, 
+        lines = super().add_segments(points, end_points, line_width, values, color_map, name, use_origin, 
                                     pre_add, relative_end_points, spherical_angles, radians)
-        
         if bounding_mesh is None:
             bounding_mesh = self.bounding_mesh
         if trim_outliers and bounding_mesh is not None:
@@ -614,7 +624,7 @@ class MouseBrainViewer(Viewer):
         return lines
 
     def add_lines(self, points, line_width=2, values=None, color_map='Accent', name='Lines', 
-                use_origin=True, add_to_scene=True, trim_outliers=True, bounding_mesh=None):
+                use_origin=True, add_to_scene=True, trim_outliers=True, bounding_mesh=None, ibl_flip_yz=True):
         """
         Create a set of lines with given point sets
         :param points: List of lists of 3D coordinates
@@ -628,7 +638,9 @@ class MouseBrainViewer(Viewer):
         :param trim_outliers: Whether segments that are out of the brain envelope are trimmed or not. True by default
         :param bounding_mesh: A closed manifold surface mesh used for trimming lines. If None,
         the current self.bounding_mesh is used (if it exists)
-        :return: Lines
+        :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
+        on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+        :return: objects.Lines
         """
         #target =  list(points.keys()) if isinstance(points, dict) else range(len(points))
         if not isinstance(points, np.ndarray):
@@ -645,8 +657,10 @@ class MouseBrainViewer(Viewer):
             for index in range(len(points)):
                 point_set = points[index]
                 point_set = np.array(point_set).astype(float)
+                if ibl_flip_yz:
+                    point_set = point_set * [[1, -1, -1]]
                 if use_origin:
-                    point_set = point_set * [[1, -1, -1]] + self.model.origin
+                    point_set = point_set + self.model.origin
                 all_points.append(point_set)
                 indices.append(line_id)
                 line_id += 1
@@ -672,7 +686,7 @@ class MouseBrainViewer(Viewer):
     def add_volume(self, data=None, resolution=None, file_path=None, color_map='viridis', 
                     alpha_map=None, select=False, add_to_scene=True, transpose=None):
         """
-        Add a volume to the viewer
+        Add a volume to the viewer with box clipping and slicing enabled by default
         :param data: Volume image data or a file_path
         :parma resolution: Resoluton of the volume
         :param file_path: File path of the volume. If you don't provide an image volume data,
@@ -685,11 +699,12 @@ class MouseBrainViewer(Viewer):
         :param transpose: Transposition parameter. If None. nothing happens. If True, 
         then the default IBL transposition is applied. You can provide your own, that is,
         a list of 3 elements to reorder the volume as desired.
+        :return: VolumeController
         """
         if transpose == True:
             transpose = self.ibl_transpose
-        super().add_volume(data, resolution, file_path, color_map, alpha_map, 
-                            select, add_to_scene, transpose)
+        return super().add_volume(data, resolution, file_path, color_map, 
+                                alpha_map, select, add_to_scene, transpose)
 
     def update_reveal_region(self, widget=None, event=None, value=0.0):
         """

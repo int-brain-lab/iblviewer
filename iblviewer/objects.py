@@ -50,40 +50,47 @@ class Lines(vedo.Lines):
     """
     Improved Lines class that supports point sets of varying lengths
     """
-    def __init__(self, point_sets, c='gray', alpha=1, lw=1, dotted=False):
+    def __init__(self, points, end_points=None, c='gray', alpha=1, lw=1, dotted=False):
         """
         Constructor
         parameters are the same as vedo.Line
         """
-        polylns = vtk.vtkAppendPolyData()
-        for point_set in point_sets:
-            positions = point_set
-            if isinstance(point_set, np.ndarray):
+        #if not isinstance(point_sets, np.ndarray):
+            #point_set = np.array(point_sets, dtype=object)
+        if len(points.shape) > 1 and points.shape[1] == 2:
+            super().__init__(points, end_points, c=c, alpha=alpha, lw=lw, dotted=dotted)
+        else:
+            polylns = vtk.vtkAppendPolyData()
+            for point_set in points:
+                positions = point_set
+                if not isinstance(point_set, np.ndarray):
+                    point_set = np.array(point_set)
                 # numpy_to_vtk is unhappy if dtype is not to its liking
                 point_set = point_set.astype(float)
                 positions = numpy_to_vtk(np.ascontiguousarray(point_set), deep=True)
 
-            # This part taken from class Line, which accepts n points
-            points = vtk.vtkPoints()
-            points.SetData(positions)
-            
-            lines = vtk.vtkCellArray()
-            npt = len(point_set)
-            lines.InsertNextCell(npt)
-            for i in range(npt):
-                lines.InsertCellPoint(i)
+                # This part taken from class Line, which accepts n points
+                vtk_points = vtk.vtkPoints()
+                vtk_points.SetData(positions)
+                
+                lines = vtk.vtkCellArray()
+                num_pts = len(point_set)
+                lines.InsertNextCell(num_pts)
+                for i in range(num_pts):
+                    lines.InsertCellPoint(i)
 
-            poly = vtk.vtkPolyData()
-            poly.SetPoints(points)
-            poly.SetLines(lines)
-            polylns.AddInputData(poly)
-        polylns.Update()
+                poly = vtk.vtkPolyData()
+                poly.SetPoints(vtk_points)
+                poly.SetLines(lines)
+                polylns.AddInputData(poly)
+            polylns.Update()
 
-        vedo.Mesh.__init__(self, polylns.GetOutput())
-        self.lw(lw).lighting('off')
-        if dotted:
-            self.GetProperty().SetLineStipplePattern(0xF0F0)
-            self.GetProperty().SetLineStippleRepeatFactor(1)
+            vedo.Mesh.__init__(self, polylns.GetOutput())
+            self.lw(lw).lighting('off')
+            if dotted:
+                self.GetProperty().SetLineStipplePattern(0xF0F0)
+                self.GetProperty().SetLineStippleRepeatFactor(1)
+
         self.name = 'Lines'
 
 
@@ -127,8 +134,11 @@ class Points(vedo.Points):
         points = vtk.vtkPoints()
         num_points = len(positions)
         points.SetNumberOfPoints(num_points)
-        for p_id in range(num_points):
-            points.SetPoint(p_id, positions[p_id])
+        #for p_id in range(num_points):
+            #points.SetPoint(p_id, positions[p_id])
+        positions = positions.astype(float)
+        points_data = numpy_to_vtk(np.ascontiguousarray(positions), deep=True)
+        points.SetData(points_data)
         polydata.SetPoints(points)
 
         # We have to set scalar values after the object is created because VTK automatically
@@ -138,6 +148,9 @@ class Points(vedo.Points):
             if not isinstance(values, np.ndarray):
                 values = np.array(values)
             if len(values.shape) > 1 and values.shape[1] > 1:
+                # Safeguard
+                if num_points == values.shape[0]:
+                    values.reshape(num_points, -1)
                 all_values = values.ravel()
                 if min_v is None:
                     min_v = min(all_values)
@@ -263,20 +276,23 @@ class Points(vedo.Points):
         :param step_id: ID for naming the scalar with Scalars_#ID
         :return: vtkFloatArray
         """
-        scalars = vtk.vtkFloatArray()
+        scalars = numpy_to_vtk(np.ascontiguousarray(values), deep=True)
         num_existing_ones = polydata.GetPointData().GetNumberOfArrays()
         if step_id is None:
             step_id = num_existing_ones
         scalars.SetName(self.scalars_prefix + str(step_id))
-        for p_id in range(len(values)):
-            scalars.InsertNextTuple1(values[p_id])
         polydata.GetPointData().AddArray(scalars)
         return scalars
 
 
 class Spheres(vedo.Mesh):
     """
-    Reimplementation of vedo.Spheres that was not handling things properly.
+    Reimplementation of vedo.Spheres that was not handling things properly
+    when it comes to set time series and visualise them with colors.
+
+    This class isn't used at the moment. Points is preferred as it acts either as
+    vedo.Spheres or as screen space Points depending on screen_space param.
+
     In general, vedo uses "c" and "r" short variable names which are a hindrance...
     utils.Spheres is deprecated and you should favor utils.Points instead.
     """

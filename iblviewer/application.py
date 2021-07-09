@@ -460,6 +460,9 @@ class Viewer():
         vedo.settings.defaultFont = self.model.ui.font
         vedo.settings.enableDefaultKeyboardCallbacks = False
 
+    def silent(*args, **kwargs):
+        pass
+
     def initialize(self, context=None, embed_ui=False, embed_font_size=16, web_ui=False, jupyter=False, offscreen=None, 
                     plot=None, plot_window_id=0, num_windows=1, render=False, dark_mode=False, auto_select_first_object=True):
         """
@@ -478,6 +481,8 @@ class Viewer():
         :param auto_select_first_object: Auto select the first object displayed
         """
         print('IBL Viewer...')
+
+        vedo.colors.printc = self.silent
 
         self.model.ui.font_size = embed_font_size
         self.model.web_ui = jupyter is True or web_ui is True
@@ -964,6 +969,10 @@ class Viewer():
             #if self.outline_actor is not None:
                 #self.plot.remove(self.self.outline_actor, render=False)
             outline_actor = vedo.Mesh(pdm.GetInput())
+            if 'volume' in utils.get_type(self.model.selection):
+                # vtkVolumeOutlineSource doesn't account for the position of the object
+                # so we have to move the outline here
+                outline_actor.pos(self.model.selection.pos())
             outline_actor.SetPickable(False)
             outline_actor.GetProperty().SetOpacity(self.model.outline_opacity)
             outline_actor.GetProperty().SetColor(self.model.outline_color)
@@ -971,13 +980,13 @@ class Viewer():
             self.outline_actor = outline_actor
             self.plot.add(outline_actor)
 
-    def add_segments(self, start_points, end_points=None, line_width=2, values=None, color_map='Accent', 
+    def add_segments(self, points, end_points=None, line_width=2, values=None, color_map='Accent', 
                     name='Segments', use_origin=True, add_to_scene=True,
                     relative_end_points=False, spherical_angles=None, radians=True):
         """
         Add a set of segments (lines made of two points). The difference with add_lines() 
         is that you have more options like giving spherical angles and setting relative end points.
-        :param start_points: 3D numpy array of points of length n
+        :param points: 3D numpy array of points of length n
         :param end_points: 3D numpy array of points of length n
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
@@ -994,6 +1003,9 @@ class Viewer():
         :param radians: Whether the given spherical angle data is in radians or in degrees
         :return: Lines
         """
+        '''
+        # The base assumption is that points is a 2D array, each row having a start and end point
+        seg_points = np.array(points, dtype=object)
         if end_points is None and spherical_angles is not None:
             relative_end_points = True
             spherical_angles = np.array(spherical_angles)
@@ -1002,21 +1014,17 @@ class Viewer():
             else:
                 end_points = spherical_angles.apply(utils.spherical_degree_angles_to_xyz)
             if relative_end_points:
-                end_points += start_points
-            point_sets = np.c_[start_points, end_points].reshape(-1, 2, 3)
-        elif end_points is None:
-            point_sets = start_points
-            # We assume start_points are segments (arrays of two 3d arrays)
-            #end_points = start_points[:, -1]
-            #start_points = start_points[:, 0]
-        elif end_points is not None and len(start_points) != len(end_points):
-            logging.error('Mismatch between start and end points length. Fix your data and call add_lines() again.')
-            return
-
-        return self.add_lines(point_sets, line_width, values, color_map, name, use_origin, add_to_scene)
+                end_points += points
+            seg_points = np.c_[points, end_points].reshape(-1, 2, 3)
+        elif end_points is not None and len(points) != len(end_points):
+            n = min(len(points), len(end_points))
+            logging.error(f'[add_segments() error] Mismatch between start and end points length. Only {n} segments shown.')
+            seg_points = np.c_[points[n], end_points[n]].reshape(-1, 2, 3)
+        '''
+        return self.add_lines(points, line_width, values, color_map, name, use_origin, add_to_scene)
 
     def add_lines(self, points, line_width=2, values=None, color_map='Accent', 
-                name='Lines', use_origin=True, add_to_scene=True, **kwargs):
+                    name='Lines', use_origin=True, add_to_scene=True):
         """
         Create a set of lines with given point sets
         :param points: List or 2D array of 3D coordinates
@@ -1027,7 +1035,7 @@ class Viewer():
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
-        :return: Lines
+        :return: objects.Lines
         """
         if not isinstance(points, np.ndarray):
             points = np.array(points, dtype=object)
@@ -1047,10 +1055,11 @@ class Viewer():
         self.register_object(lines)
         if add_to_scene:
             self.plot.add(lines)
+
         return lines
         
-    def add_points(self, positions, radius=10, values=None, color_map='Accent', 
-                    name='Points', screen_space=False, use_origin=True, add_to_scene=True, **kwargs):
+    def add_points(self, positions, radius=10, values=None, color_map='Accent', name='Points', 
+                    screen_space=False, use_origin=True, add_to_scene=True, **kwargs):
         """
         Add new points as circles or spheres
         :param positions: 3D array of coordinates
@@ -1069,14 +1078,15 @@ class Viewer():
         far you are from them (which can lead to unwanted visual results)
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
-        :return: Either Points or Spheres, depending on as_sphere param
+        :return: objects.Points
         """
         if use_origin:
             positions = np.array(positions) + self.model.origin
         if values is None:
             values = np.arange(len(positions))
         
-        # You cannot easily set a time series to vedo.Spheres() so this one of the reasons why utils.Points exists
+        # You cannot easily set a time series to vedo.Spheres() 
+        # so this one of the reasons why objects.Points exists
         points = obj.Points(positions, radius, values, color_map, screen_space, **kwargs)
         points.lighting('off')
         points.pickable(True)
@@ -1087,7 +1097,6 @@ class Viewer():
 
         if add_to_scene:
             self.plot.add(points)
-        pd = points.polydata().GetPointData()
         return points
 
     def add_surface_mesh(self, file_path, mesh_name=None, add_to_scene=True):
@@ -1096,6 +1105,7 @@ class Viewer():
         :param file_path: Mesh file path (any kind of file supported by vedo)
         :param mesh_name: Name of the mesh. If None, the file name will be used.
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
+        :return: Mesh
         """
         mesh = vedo.load(file_path)
         mesh.name = mesh_name if mesh_name is not None else utils.split_path(file_path)[1]
@@ -1107,7 +1117,7 @@ class Viewer():
     def add_volume(self, data=None, resolution=None, file_path=None, color_map='viridis', 
                     alpha_map=None, select=False, add_to_scene=True, transpose=None):
         """
-        Add a volume to the viewer
+        Add a volume to the viewer with box clipping and slicing enabled by default
         :param data: Volume image data or a file_path
         :param resolution: Resoluton of the volume
         :param file_path: File path of the volume. If you don't provide an image volume data,
@@ -1120,6 +1130,7 @@ class Viewer():
         :param transpose: Transposition parameter. If None. nothing happens. If True, 
         then the default IBL transposition is applied. You can provide your own, that is,
         a list of 3 elements to reorder the volume as desired.
+        :return: VolumeController
         """
         if isinstance(data, str) and file_path is None:
             file_path = data
@@ -1135,14 +1146,14 @@ class Viewer():
         if alpha_map is None:
             alpha_map = np.linspace(0.0, 1.0, 10)
             #alpha_map = np.flip(alpha_map)
-        view = VolumeController(self.plot, model, add_to_scene=add_to_scene)
-        view.set_color_map(color_map, alpha_map)
+        controller = VolumeController(self.plot, model, add_to_scene=add_to_scene)
+        controller.set_color_map(color_map, alpha_map)
         # register_object is automatically called on view.actor within register_controller
-        self.register_controller(view, view.get_related_actors())
+        self.register_controller(controller, controller.get_related_actors())
         if select:
-            self.select(view.actor)
+            self.select(controller.actor)
             self.view_selected()
-        return view
+        return controller
 
     def toggle_menu(self, name=None, context=None):
         """
@@ -1229,7 +1240,7 @@ class Viewer():
         """
         Initialize selection marker and text
         """
-        self.selection_info = self.add_text('selection_info', '', [40, 400], 
+        self.selection_info = self.add_text('selection_info', '', [40, 500], 
                                             color=self.model.ui.color)
         self.plot.add(self.selection_info, render=False)
         self.set_selection_marker()
@@ -1647,6 +1658,13 @@ class Viewer():
     def add_text(self, name, text, pos, color=None, justify='top-left', context=None, **kwargs):
         """
         Add a 2D text on scene
+        :param name: Name of the object
+        :param text: Text string
+        :param pos: Position on screen
+        :param color: Color of the font
+        :param justify: Type of justification
+        :param context: Context to register this object to
+        :return: Text2D
         """
         if color is None:
             color = self.model.ui.color

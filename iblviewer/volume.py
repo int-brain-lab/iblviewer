@@ -579,12 +579,19 @@ class VolumeController():
     Wrapper class that handles both the volume and its slices
     """
 
-    def __init__(self, plot, model, initialize=True, clipping=True, 
-                slicer_box=True, center_on_edges=False, add_to_scene=True):
+    def __init__(self, plot, model, initialize=True, clipping=True, slicer_box=True, 
+                center_on_edges=False, alpha_unit_upper_offset=0.0, add_to_scene=True):
         """
         Constructor
         :param plot: Plot instance
         :param model: VolumeModel instance
+        :param initialize: Whether the initalization
+        :param clipping: Whether clipping is enabled at init time
+        :param slicer_box: Whether the slicer box is enabled at init
+        :param center_on_edges: Whether the volume is offest by half a voxel or not
+        :param alpha_unit_upper_offset: The offset to apply to alpha unit computation.
+        If greater than 0, the volume will be less opaque
+        :param add_to_scene: Whether the volume is added to scene after init
         """
         self.plot = plot
         self.model = model
@@ -595,6 +602,7 @@ class VolumeController():
         self.mask = None
         self.isosurfaces = {}
         self.bounding_mesh = None
+        self.alpha_unit_upper_offset = alpha_unit_upper_offset
         self.alpha_factor = 0.001 # * self.model.resolution
 
         self.clipping_planes = None
@@ -629,8 +637,8 @@ class VolumeController():
         Set the volume actor for visualization in VTK
         :param clipping: Whether clipping is enabled
         :param slicer_box: Whether the slicer box mode is enabled (6 clipping planes)
-        :param center_on_edges: Whether the volume's center is aligned to its edges rather
-        than voxel center
+        :param center_on_edges: Whether the volume's center is aligned to its edges 
+        rather than the voxel center
         :param add_to_scene: Whether the object is added to the scene
         """
         self.build_actor(center_on_edges, add_to_scene)
@@ -708,17 +716,27 @@ class VolumeController():
         value = 1.1 - (alpha_unit / r)**0.5
         return value
 
+    def set_opacity(self, value):
+        """
+        Set the opacity of the volume like in set_opacity_unit()
+        :param value: Opacity value between 0.0 and 1.0
+        :return: Resulting alpha unit
+        """
+        self.set_opacity_unit(value)
+
     def set_opacity_unit(self, value):
         """
-        Set the alpha unit of the volume. 
-        The alpha unit defines how mucha voxel is transparent.
+        Set the opacity of the volume by modifying its alpha unit (a VTK thing).
+        The alpha unit defines how much a voxel is transparent to incoming ray.
+        This method normalizes the range between 0.0 and 1.0 as it depends
+        on the resolution of the volume
         :param value: Opacity value between 0.0 and 1.0
-        :return: Alpha unit
+        :return: Resulting alpha unit
         """
         r = self.model.resolution
-        # 1.1 is chosen and not 1.0 because when value == 1.0, that would
+        # 1 is chosen and not 1.0 because when value == 1.0, that would
         # mean that the volume is fully opaque and this yields artifacts with VTK
-        alpha_unit = (1.1 - value)**2 * r
+        alpha_unit = (1 + self.alpha_unit_upper_offset - value)**2 * r
         # vedo calls it "alpha" unit, vtk "opacity" unit. same-same!
         self.actor.alphaUnit(alpha_unit)
         return alpha_unit
@@ -737,7 +755,7 @@ class VolumeController():
             raise ValueError(f'Given volume resolution {self.model.resolution} is invalid')
         return spacing
 
-    def build_actor(self, center_on_edges=False, add_to_scene=True):
+    def build_actor(self, center_on_edges=False, add_to_scene=True): #[1, 2]
         """
         Set the volume actor for visualization in VTK
         :param center_on_edges: Whether alignment by one voxel is applied
@@ -754,7 +772,7 @@ class VolumeController():
 
         if center_on_edges:
             # Moving the volume by one voxel. This is possibly due the use of custom spacing.
-            self.actor.pos(spacing)
+            self.actor.pos(self.actor.pos() + spacing)
             center = np.array(self.actor.pos()) + self.actor.center()
             if np.linalg.norm(center - self.model.center) > 0:
                 #print('Adjusting volume center from', self.model.center, 'to', center)
@@ -768,6 +786,31 @@ class VolumeController():
 
         if add_to_scene:
             self.plot.add(self.actor, render=False)
+
+    def set_position(self, position):
+        """
+        Set the position of the volume
+        """
+        self.actor.pos(position)
+        # TODO: we're entering in unstable things when we move the volume
+        # because there is not yet a guaranteed support for updating the slices 
+        # with the correct position
+        self.reset_clipping_planes()
+
+    def mirror_volume(self, axes):
+        """
+        Mirror the volume on given axes
+        :param mirror_axes: A list of axes (either 0, 1, 2 or 'x', 'y', 'z') on which
+        the volume will be mirrored. Optional
+        """
+        if axes is None or self.actor is None:
+            return
+        axes_str = ['x', 'y', 'z']
+        for axis in axes:
+            if isinstance(axis, int) and 0 <= axis <= 2:
+                axis = axes_str[axis]
+            if isinstance(axis, str) and len(axis) == 1:
+                self.actor.mirror(axis=axis.lower())
 
     def initialize_picker(self, opacity_iso_value=0.0001):
         """
@@ -794,7 +837,7 @@ class VolumeController():
         """
         for axis_id in range(6):
             slicer_model = SlicerModel(axis=axis_id)
-            slicer_model.align_to_axis(axis_id, self.model.center, self.model.dimensions)
+            slicer_model.align_to_axis(axis_id, self.model.dimensions)
             self.model.slicers.store(slicer_model)
             self.slicers[axis_id] = SlicerView(self.plot, self, slicer_model)
         
@@ -859,7 +902,7 @@ class VolumeController():
             slicer_model = slicer_models[slicer_id]
             plane_id = slicer_model.get_box_plane_id()
             plane = self.clipping_planes.GetItem(plane_id)
-            plane.SetOrigin(slicer_model.origin)
+            plane.SetOrigin(slicer_model.origin + self.actor.pos())
             plane.SetNormal(slicer_model.normal)
 
     def clip_on_axis(self, position=None, axis=None, normal=None):
@@ -1276,10 +1319,11 @@ class SlicerModel:
         axis = (vtk_axis - vtk_axis % 2) // 2
         return axis, orientation
 
-    def align_to_axis(self, axis, center=None, dimensions=None):
+    def align_to_axis(self, axis, dimensions=None):
         """
         Set the axis of the slicer
         :param axis: See parameter vtk_axis in SlicerModel.get_axis_aligned_info()
+        :param dimensions: Dimensions of the volume
         """
         if not isinstance(axis, int):
             return
@@ -1620,11 +1664,12 @@ class SlicerView():
         """
         Update slice object according to data in the model
         """
-        #had_slice = self.got_slice
+        had_slice = self.got_slice
         if isinstance(self.model.axis, int) and 0 <= self.model.axis <= 2:
             self.slice_on_axis(self.model.value, self.model.normal, self.model.axis)
         else:
             self.slice_on_normal(self.model.origin, self.model.normal)
+        #self.actor.pos(*(self.volume_view.actor.pos()-self.actor.pos()))
 
         #if not (not had_slice and self.got_slice):
             #return
@@ -1654,7 +1699,8 @@ class SlicerView():
         if self.model.clipping_planes is not None:
             self.actor.mapper().SetClippingPlanes(self.model.clipping_planes)
 
-        self.plot.add(self.actor, render=True)
+        if not had_slice:
+            self.plot.add(self.actor, render=True)
 
     def apply_lut(self, lut=None):
         """
