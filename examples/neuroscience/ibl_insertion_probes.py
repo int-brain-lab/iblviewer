@@ -57,21 +57,20 @@ def get_picks_mean_vectors(xyz_picks, extent=3):
     return vectors, ids
 
 
-def add_insertion_probes(viewer, one_connection, reduced=False, line_width=2, trim_outliers=True):
+def add_insertion_probes(viewer, one_connection, as_segments=False, line_width=2, trim_outliers=True):
     """
     Add insertion probe vectors
     :param viewer: The IBLViewer controller
     :param one_connection: The "one" connection to IBL server
-    :param reduced: Whether insertion probes should be reduced to simple lines
+    :param as_segments: Whether insertion probes should be reduced to straight lines (segments)
     :param trim_outliers: Whether you want the lines to be cut when they're out of the brain
     :param with_labels: Whether labels should be added to the lines
     """
     lines_data, line_ids = get_bwm_ins_alyx(one_connection)
-    if reduced:
+    if as_segments:
         segments_data, segment_ids = get_picks_mean_vectors(lines_data)
         line_ids = np.array(line_ids)
         segment_ids = line_ids[segment_ids]
-        print(segments_data[0])
         lines = viewer.add_segments(segments_data, line_width=line_width, 
                                     add_to_scene=True, trim_outliers=trim_outliers)
     else:
@@ -85,5 +84,5 @@ if __name__ == '__main__':
     one_connection = oneibl.one.ONE(base_url="https://alyx.internationalbrainlab.org")
     viewer = MouseBrainViewer()
     viewer.initialize(resolution=25, embed_ui=True)
-    add_insertion_probes(viewer, one_connection, reduced=True, line_width=5)
+    add_insertion_probes(viewer, one_connection, as_segments=False, line_width=5)
     viewer.show()

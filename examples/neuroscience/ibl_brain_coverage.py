@@ -16,7 +16,7 @@ DIST_FCN = np.array([100, 150]) / 1e6
 
 
 def compute_coverage_volume(ba=None):
-    file_channels = next(viz.utils.EXAMPLES_DATA_FOLDER.glob('channels.*.pqt'))
+    file_channels = next(utils.EXAMPLES_DATA_FOLDER.glob('channels.*.pqt'))
 
     print('Computing coverage volume...')
     # read the channels files and create a volume with one in each voxel containing a spike
@@ -66,7 +66,7 @@ resolution = 50
 viewer.initialize(resolution=resolution, mapping='Allen-lr', embed_ui=True, dark_mode=False)
 
 ba = viewer.ibl_model.atlas
-file_path = app.utils.EXAMPLES_DATA_FOLDER.joinpath(f'./ncov_{resolution}.npz')
+file_path = utils.EXAMPLES_DATA_FOLDER.joinpath(f'./ncov_{resolution}.npz')
 if os.path.exists(str(file_path)):
     ncov = np.load(str(file_path))['arr_0']
 else:
@@ -77,7 +77,8 @@ else:
     print('Done computing volume with range', np.min(ncov), np.max(ncov))
     np.savez_compressed(str(file_path), ncov)
 
-volume = viewer.add_volume(ncov, resolution, color_map='viridis', transpose=True, select=True) #, alpha_map=[0, 0.5, 1]
+volume_controller = viewer.add_volume(ncov, resolution, color_map='viridis', transpose=True, select=True) #, alpha_map=[0, 0.5, 1]
+volume_controller.set_opacity(1.0)
 viewer.show().close()
 '''
 ncov[ncov == -1] = np.nan

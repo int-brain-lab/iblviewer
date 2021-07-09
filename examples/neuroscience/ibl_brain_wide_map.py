@@ -266,7 +266,7 @@ if __name__ == '__main__':
     av = np.copy(values) * np.random.random(len(values))
     bv = np.copy(values) * np.random.random(len(values))
     cv = np.copy(values) * np.random.random(len(values))
-    values = np.array([values, av, bv, cv])
+    values = np.c_[values, av, bv, cv]
 
     viewer = MouseBrainViewer()
     print('Data report: using', len(insertions), 'insertions and', len(positions), 'channels (point neurons)')
@@ -274,8 +274,25 @@ if __name__ == '__main__':
     # This starts the viewer with two volumes: the segmented atlas and the DWI of the mouse brain
     viewer.initialize(resolution=50, add_dwi=True, dwi_color_map='viridis', 
                         add_atlas=True, mapping='Allen', dark_mode=True, embed_ui=True)
-    # We add all the points together as one object. The fewer objects on your 3D scene, the faster it will render.
-    points = viewer.add_points(positions, radius=16, values=values, as_spheres=True, noise_amount=100, add_to_scene=True)
-    # You will need some CPU/GPU power to handle volume transparency and all those semi-transparent points
+
+    # Below are a few optimizations you could use if your computer 
+    # is too slow to visualize the result:
+
+    # 1. We add all the points together as one object. 
+    # The fewer objects on your 3D scene, the faster it will render.
+
+    # 2. Activate screen space mode so that the points are in 2D.
+    # This can literally change the game if you have a low-end computer
+
+    # 3. Do not trim outliers, because the computation to know if each
+    # and every point is within the brain is quite demanding.
+    points = viewer.add_points(positions, radius=8, values=values, screen_space=True, 
+                                noise_amount=100, trim_outliers=False, add_to_scene=True)
+
+    # You will need some CPU/GPU power to handle volume 
+    # transparency and all those semi-transparent points
     points.alpha(0.5)
+
+    # Finally, before showing everything, we select the latest added object (the points)
+    viewer.select(-1)
     viewer.show()
