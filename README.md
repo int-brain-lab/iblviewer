@@ -38,14 +38,37 @@ pip install git+https://github.com/int-brain-lab/iblviewer.git
 ```
 
 ## Examples
-Insertion probes, or how to display lines made of an heterogeneous amounf of points.
-![Demo 1](examples/neuroscience/ibl_brain_wide_map.py)
+Sample code to run the viewer:
+```python
+from iblviewer.application import Viewer
+viewer = Viewer()
+viewer.initialize(embed_ui=True)
+# Add some random point data
+points = np.random.random((500, 3)) * 1000
+viewer.add_points(points)
+# Select and autofocus the last added object (the points)
+viewer.select(-1) 
+# viewer.select(points) or viewer.select(points.name) yield the same result
+viewer.show()
+```
 
-Time series of values assigned to brain regions
-![Demo 2](examples/neuroscience/ibl_brain_wide_map.py)
+Sample code to run the mouse atlas viewer:
+```python
+from iblviewer.mouse_brain import MouseBrainViewer
+viewer = MouseBrainViewer()
+# See initialize parameters for more choices
+viewer.initialize(resolution=50, mapping='Allen', add_atlas=True, 
+                    add_dwi=False, embed_ui=True, jupyter=False)
+viewer.show()
+```
 
-Point neurons and connectivity data
-![Demo 3](examples/neuroscience/point_neurons.py)
+[Volumetric time series](examples/neuroscience/ibl_volume_mapping.py) of values assigned to brain regions.
+
+[Point neurons](examples/neuroscience/ibl_point_neurons.py) and connectivity data.
+
+[Insertion probes](examples/neuroscience/ibl_insertion_probes.py), or how to display lines made of an heterogeneous amount of points. This example requires valid credentials to IBL back-end.
+
+Since this tool is built on top of VTK and [vedo](https://github.com/marcomusy/vedo), a wrapper for VTK that makes it easy to use, you have endless possibilities for plotting and visualizing your data.
 
 ## Architecture
 This application relies on the well-known pattern MVC (Model-View-Controller).
@@ -63,31 +86,10 @@ IBLViewer adds the following features:
 - interactive volumetric data mapping
 - mixing volumes and surfaces
 
-## Examples 
-
-Sample code to run the viewer
-```python
-from iblviewer.application import Viewer
-viewer = Viewer()
-viewer.initialize(embed_ui=True, jupyter=False)
-# Test data
-points = np.random.random((500, 3)) * 1000
-viewer.add_points(points)
-viewer.render()
-```
-
-Sample code to run the mouse atlas viewer
-```python
-from iblviewer.mouse_brain import MouseBrainViewer
-viewer = MouseBrainViewer()
-viewer.initialize(resolution=50, mapping='Allen', embed_ui=True, jupyter=False)
-viewer.render()
-```
-
-Have a look at the examples folder which contains several cases. Since this tool is built on top of vedo, a wrapper for vtk that makes it easy to use, you have endless possibilities for plotting and visualizing your data. See https://github.com/marcomusy/vedo for (lots of) examples.
+![UML schema](assets/doc/iblviewer_architecture.jpg?raw=true)
 
 ## Issues and feature request
-Feel free to request features and raise issues.
+Feel free to request features, submit PRs and raise issues.
 
 ## Author
 Nicolas Antille, International Brain Laboratory, 2021
