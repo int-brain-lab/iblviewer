@@ -900,14 +900,18 @@ class Viewer():
             text = f'{self.model.selection.name}'
             data_type = self.model.selection_type.title()
             if self.model.selection_point is not None:
-                text += f'\n\nX: {self.model.selection_point[0]:0.2f}'
-                text += f'\nY: {self.model.selection_point[1]:0.2f}'
-                text += f'\nZ: {self.model.selection_point[2]:0.2f}'
+                # We display a point relative to the origin set by the user
+                relative_point = self.model.selection_point - self.model.origin
+                text += f'\n\nX: {relative_point[0]:0.2f}'
+                text += f'\nY: {relative_point[1]:0.2f}'
+                text += f'\nZ: {relative_point[2]:0.2f}'
+                self.selection_marker.SetVisibility(True)
+            else:
+                self.selection_marker.SetVisibility(False)
             if self.model.selection_value is not None:
                 text += f'\n\n{data_type} value: {self.model.selection_value}'
             self.selection_marker.pos(self.model.selection_point)
             self.selection_marker.color(self.model.ui.color)
-            self.selection_marker.SetVisibility(True)
         self.selection_info.GetMapper().SetInput(text)
 
     def draw_axes(self):
@@ -1139,9 +1143,7 @@ class Viewer():
         if data is None:
             model.load_volume(file_path)
         if transpose is not None:
-            # Transposing volume so that its XYZ axes are aligned
-            # to other data sets like points and lines
-            model.transpose(self.ibl_transpose)
+            model.transpose(transpose)
         model.compute_size()
         if alpha_map is None:
             alpha_map = np.linspace(0.0, 1.0, 10)
@@ -2327,7 +2329,6 @@ class Viewer():
             if hasattr(cell_data, 'GetArrayNames'):
                 names = cell_data.GetArrayNames()
                 #name = actor.scalars_prefix + str(value)
-                print(value, 'selecting', names[value])
                 #point_data.SetActiveScalars(names[value])
                 # Necessary for utils.Points in sphere mode (non screen-space)
                 actor.mapper().SelectColorArray(names[value])

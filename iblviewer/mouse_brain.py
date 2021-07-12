@@ -564,12 +564,16 @@ class MouseBrainViewer(Viewer):
         on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
         :return: objects.Points
         """
+        axes = [1, 1, 1]
         if ibl_flip_yz:
-            positions = np.array(positions) * [[1, -1, -1]]
+            axes = [1, -1, -1]
+            positions = np.array(positions) * [axes]
         if noise_amount is not None:
             positions += np.random.rand(len(positions), 3) * noise_amount
         link = True if add_to_scene and not trim_outliers else False
-        points = super().add_points(positions, radius, values, color_map, name, screen_space, use_origin, link, **kwargs)
+        points = super().add_points(positions, radius, values, color_map, name, 
+                                    screen_space, use_origin, link, **kwargs)
+        points.axes = axes
         if bounding_mesh is None:
             bounding_mesh = self.bounding_mesh
         if trim_outliers and bounding_mesh is not None:
@@ -607,13 +611,16 @@ class MouseBrainViewer(Viewer):
         on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
         :return: objects.Lines
         """
+        axes = [1, 1, 1]
         if ibl_flip_yz:
-            points = np.array(points) * [[1, -1, -1]]
+            axes = [1, -1, -1]
+            points = np.array(points) * [axes]
             if end_points is not None:
-                end_points = np.array(end_points) * [[1, -1, -1]]
+                end_points = np.array(end_points) * axes
         pre_add = True if add_to_scene and not trim_outliers else False
         lines = super().add_segments(points, end_points, line_width, values, color_map, name, use_origin, 
                                     pre_add, relative_end_points, spherical_angles, radians)
+        lines.axes = axes
         if bounding_mesh is None:
             bounding_mesh = self.bounding_mesh
         if trim_outliers and bounding_mesh is not None:
@@ -642,6 +649,9 @@ class MouseBrainViewer(Viewer):
         on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
         :return: objects.Lines
         """
+        axes = [1, 1, 1]
+        if ibl_flip_yz:
+            axes = [1, -1, -1]
         #target =  list(points.keys()) if isinstance(points, dict) else range(len(points))
         if not isinstance(points, np.ndarray):
             '''
@@ -654,11 +664,11 @@ class MouseBrainViewer(Viewer):
             all_points = []
             indices = []
             line_id = 0
+            # Possible speed improvement: use map or np.apply_along_axis
             for index in range(len(points)):
                 point_set = points[index]
                 point_set = np.array(point_set).astype(float)
-                if ibl_flip_yz:
-                    point_set = point_set * [[1, -1, -1]]
+                point_set = point_set * [axes]
                 if use_origin:
                     point_set = point_set + self.model.origin
                 all_points.append(point_set)

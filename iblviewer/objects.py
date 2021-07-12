@@ -55,6 +55,7 @@ class Lines(vedo.Lines):
         Constructor
         parameters are the same as vedo.Line
         """
+        self.axes = [1, 1, 1]
         #if not isinstance(point_sets, np.ndarray):
             #point_set = np.array(point_sets, dtype=object)
         if len(points.shape) > 1 and points.shape[1] == 2:
@@ -127,6 +128,7 @@ class Points(vedo.Points):
         where id starts at 0.
         """
         self.scalars_prefix = 'Scalars_' if scalars_prefix is None else scalars_prefix
+        self.axes = [1, 1, 1]
 
         # Multi component (ndimensional) arrays in vtk:
         # https://vtk.org/doc/nightly/html/classvtkAbstractArray.html#a528de7a4879a219e7f82a82130186dc8
@@ -301,6 +303,7 @@ class Spheres(vedo.Mesh):
         Constructor.
         Parameters are the same as vedo.Spheres
         """
+        self.axes = [1, 1, 1]
         if isinstance(centers, vedo.Points):
             centers = centers.points()
 

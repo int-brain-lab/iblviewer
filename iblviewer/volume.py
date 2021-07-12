@@ -35,6 +35,7 @@ class VolumeModel:
     file_path: str = None
 
     scalars: Collection = field(default_factory=Collection)
+    axes: List = field(default_factory=lambda: [1, 1, 1])
     data_min: float = None
     data_max: float = None
     data_map_step: float = 1.0
@@ -164,7 +165,7 @@ class VolumeModel:
             self.data = data
         return data, mapping
 
-    def transpose(self, shape=None, volume=None):
+    def transpose(self, shape=None):
         """
         Transpose the volume for visualization in VTK
         :param shape: The new shape. If None, will default to self.transpose_shape
@@ -242,11 +243,13 @@ def blend_maps(map1, map2, time, total_time):
 
 class Volume(vedo.Volume):
     """
-    Overwriting of vedo.Volume constructor which is also ill-designed as
-    it transposes the given numpy array without us knowing about it.
+    Overwriting of vedo.Volume constructor that is ill-designed as
+    it transposes the given numpy array without us knowing about it,
+    not giving us the option to choose about that.
     """
 
-    def __init__(self, inputobj=None,
+    def __init__(self, 
+                 inputobj=None,
                  c='RdBu_r',
                  alpha=(0.0, 0.0, 0.2, 0.4, 0.8, 1.0),
                  alphaGradient=None,
@@ -260,6 +263,8 @@ class Volume(vedo.Volume):
 
         vtk.vtkVolume.__init__(self)
         vedo.BaseGrid.__init__(self)
+
+        self.axes = [1, 1, 1]
 
         ###################
         if isinstance(inputobj, str):
