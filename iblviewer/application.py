@@ -2251,7 +2251,7 @@ class Viewer():
     def previous_time_series(self, offset=1, loop=True):
         """
         Previous time series
-        :param offset: Offset integer, can be negative to go backwards
+        :param offset: Offset integer. If negative, then it's like using next_time_series()
         :param loop: Whether next() goes to 0 when it reached the end of the time series or not
         :return: Returns whether the next time series is valid (within range of the time series)
         """
