@@ -14,7 +14,7 @@ pip install ibllib
 ```
 
 An example of mouse brain-wide map of electrophysiological recordings (seen here as point neurons) in the Allen Brain Atlas CCF v3 with both DWI and segmented volumes.
-![Viewer demo](preview/iblviewer_v2_demo_brain_wide_map_1.jpg?raw=true)
+![Viewer demo](assets/doc/iblviewer_v2_demo_brain_wide_map_1.jpg?raw=true)
 
 ## Troubleshooting
 If at some point it complains about failing to uninstall vtk, it's likely that vtk is already installed within your conda environment and that it causes troubles (even if it's the proper version).
