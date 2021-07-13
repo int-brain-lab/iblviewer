@@ -60,7 +60,7 @@ def process_point_neurons(data):
 
 if __name__ == '__main__':
     viewer = MouseBrainViewer()
-    viewer.initialize(resolution=50, mapping='Allen', add_atlas=True, add_dwi=True, 
+    viewer.initialize(resolution=50, mapping='Allen', add_atlas=True, add_dwi=False, 
                     dwi_color_map='Greys_r', embed_ui=True)
 
     # Now add point neurons

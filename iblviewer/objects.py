@@ -138,6 +138,8 @@ class Points(vedo.Points):
         points.SetNumberOfPoints(num_points)
         #for p_id in range(num_points):
             #points.SetPoint(p_id, positions[p_id])
+        if not isinstance(positions, np.ndarray):
+            positions = np.array(positions)
         positions = positions.astype(float)
         points_data = numpy_to_vtk(np.ascontiguousarray(positions), deep=True)
         points.SetData(points_data)
@@ -176,6 +178,12 @@ class Points(vedo.Points):
             polydata.GetPointData().SetActiveScalars(scalars[0].GetName())
             if isinstance(color_map, vtk.vtkColorTransferFunction):
                 ctf = color_map
+            elif isinstance(color_map, vtk.vtkLookupTable):
+                ctf = color_map
+            elif isinstance(color_map, list) or isinstance(color_map, np.ndarray):
+                ctf = vtk.vtkColorTransferFunction()
+                for entry in color_map:
+                    ctf.AddRGBPoint(entry[0], *entry[1])
             else:
                 ctf = vtk.vtkColorTransferFunction()
                 values_range = np.linspace(min_v, max_v, 20)
@@ -256,7 +264,7 @@ class Points(vedo.Points):
         mapper.Update()
 
         self._polydata = polydata
-        self.glyph = glyph
+        self.source = glyph
         self.name = 'Points'
 
     def get_number_of_arrays(self, ignore=['GlyphScale', 'Normals']):
@@ -285,6 +293,22 @@ class Points(vedo.Points):
         scalars.SetName(self.scalars_prefix + str(step_id))
         polydata.GetPointData().AddArray(scalars)
         return scalars
+
+    def update_data(self, positions, scalars=None):
+        """
+        Update the positions of points and optionally their scalar values
+        :param positions: 3D coordinates the same length as the number 
+        of points in the object
+        :param scalars: 1D list or numpy array the same length as positions
+        """
+        vtk_positions = numpy_to_vtk(np.ascontiguousarray(positions), deep=True)
+        polydata = self.source.GetInput()
+        polydata.GetPoints().SetData(vtk_positions)
+        if scalars is not None:
+            #sn = polydata.GetPointData().GetScalars().GetName()
+            for v_id in range(len(scalars)):
+                polydata.GetPointData().GetScalars().SetValue(v_id, scalars[v_id])
+        self.source.Update()
 
 
 class Spheres(vedo.Mesh):

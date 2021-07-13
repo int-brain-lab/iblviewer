@@ -228,6 +228,22 @@ class IBLAtlasModel():
         Get how many regions are labelled
         """
         return self.atlas.regions.id.size
+
+    def get_value_from_scalar_map(self, scalar):
+        """
+        Reverse look-up in array to find a corresponding value
+        :param scalar: Scalar value
+        :return: Raw volume value
+        """
+        scalar_map = self.atlas_volume.luts.current.scalar_map
+        if scalar_map is None:
+            return
+        for value in range(len(scalar_map)):
+            if scalar_map[value] is None:
+                continue
+            #print(scalar - scalar_map[value])
+            if scalar_map[value] == scalar:
+                return value
         
     def get_mapped_data(self, value):
         """
@@ -491,15 +507,19 @@ class MouseBrainViewer(Viewer):
         Update text and point information for the current selection
         """
         super().update_info()
-        if self.atlas_controller is not None and self.model.selection == self.atlas_controller.actor:
+        if self.atlas_controller is None:
+            return
+        selection = self.model.selection
+        data = None
+        if selection == self.atlas_controller.actor or self.is_probe(selection):
             data = self.ibl_model.get_mapped_data(self.model.selection_value)
-            if data is None:
-                return
-            text = self.selection_info.GetMapper().GetInput()
-            text += f'\n{data["region_name"]}'
-            if data.get('scalar') is not None:
-                text += f'\n\nScalar value: {data["scalar"]}'
-            self.selection_info.GetMapper().SetInput(text)
+        if data is None:
+            return
+        text = self.selection_info.GetMapper().GetInput()
+        text += f'\n{data["region_name"]}'
+        if data.get('scalar') is not None:
+            text += f'\n\nScalar value: {data["scalar"]}'
+        self.selection_info.GetMapper().SetInput(text)
 
     def add_origin(self):
         """
@@ -770,65 +790,3 @@ class MouseBrainViewer(Viewer):
         Set ventral axial view
         """
         self.update_camera([0.0, 0.0, -1.0], self.model.X_UP)
-    
-    def add_probe(self, origin, destination, volume_actor):
-        """
-        Add a probe
-        """
-        raise NotImplementedError
-        actors_to_add = []
-
-        position, value = self.find_nearest_intersection(origin, destination)
-        '''
-        #if np.linalg.norm(origin - positions[0]) < np.linalg.norm()
-        pts = vedo.Points(positions, r=10).c('#dddddd')
-        line = vedo.Line(origin, destination).c('black').lw(1)
-        #print('Line length', np.linalg.norm(destination - origin))
-        #print('Origin', origin, 'destination', destination, 'dest', destination)
-        #actors_to_add.append(pts)
-        actors_to_add.append(line)
-
-        trajectory = atlas.Trajectory.fit(positions)
-        # Now see what to do with a trajectory
-        
-        num_samples = 40
-        inside_volume_distance = abs(sorted_distances[0, 1] - sorted_distances[-1, 1])
-        step = inside_volume_distance / num_samples
-        samples = [position + ray_norm * p_id * step for p_id in range(num_samples)]
-        colors = []
-        values = []
-        validated_samples = []
-        color_map = self.model.transfer_function.color_map
-        for sample in samples:
-            # Maybe use this if it is faster? To be tested
-            # ijk_result = [0.0, 0.0, 0.0]
-            # volume_actor._data.TransformPhysicalPointToContinuousIndex(xyz, ijk_result)
-            # volume_actor._data.GetPoint(ijk_result)
-            pt_id = volume_actor._data.FindPoint(*sample)
-            if 0 < pt_id < scalar_data.GetNumberOfValues():
-                value = int(scalar_data.GetValue(pt_id))
-                if value > len(color_map):
-                    value = value // 2
-                colors.append(color_map[value, 1])
-                values.append(color_map[value, 0])
-                validated_samples.append(sample)
-                #print('Sample region', self.model.metadata.id[value])
-        
-        pts = utils.Spheres(validated_samples, r=50, c=colors) 
-        actors_to_add.append(pts)
-        
-        if 0 < pt_id < scalar_data.GetNumberOfValues():
-            value = scalar_data.GetValue(pt_id)
-            allen_id = self.model.atlas.regions.id[value]
-            region = self.model.atlas.regions.get(allen_id)
-            text = f'Atlas ID: {allen_id} - {region.name[0]}'
-
-        self.plot.add(actors_to_add)
-        '''
-
-        '''
-        // Get the ID of the point that is closest to the query position
-        vtkIdType id = locator->FindClosestPoint(pt);
-        // Retrieve the first attribute value from this point
-        double value = polyData->GetPointData()->GetScalars()->GetTuple(id, 0);
-        '''

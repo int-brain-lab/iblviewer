@@ -12,8 +12,10 @@ from collections import OrderedDict
 import nrrd
 import vtk
 import vedo
+from vtk.util.numpy_support import numpy_to_vtk
 
 from iblviewer.collection import Collection
+import iblviewer.objects as obj
 import iblviewer.utils as utils
 
 
@@ -443,9 +445,14 @@ class LUTModel:
 
     def build(self, scalar_map=None, scalar_range=None, color_map=None, 
                     alpha_map=None, zero_is_transparent=True, 
-                    noise_amount=0.0, nan_rgba=None, make_active=True):
+                    noise_amount=0.0, nan_rgba=None):
         """
-        Build a look-up table (LUT, sometimes known as transfer function) for the volume
+        Build several look-up tables (LUT, sometimes known as transfer function) for the volume.
+        This is where double-mapping occurs for segmented volumes that have values from 0 to n where
+        each value defines a sub-volume or region. If we want to assign values (say from another model)
+        to these regions, we'd have to change the volume values and it would be too slow iterating over
+        each voxel in 3D. Instead we define colors that represent these values and assign them to 
+        segmented regions in a 1D list.
         :param scalar_map: A 2D list with values in first column from the volume itself and values from
         the second column being your scalar values that correspond to such region
         :param scalar_range: Min and max values in a list
@@ -454,8 +461,7 @@ class LUTModel:
         says how transparent a scalar value should be
         :param zero_is_transparent: Whether zero values are made transparent, True by default
         :param noise_amount: Whether a noise value is applied on the colors
-        :param nan_rgba: Color and transparency (RGBA) to assign to invalid (out of range or None) scalar values
-        :param make_active: Whether this one is made active (you still have to update the views after that)
+        :param nan_rgba: Color and alpha values to assign to invalid (out of range or None) scalar values
         :return: LUTModel
         """
         if color_map is None:
@@ -465,11 +471,6 @@ class LUTModel:
         if self.base_color_map is None:
             self.base_color_map = color_map
         
-        # 10 is a test, this means we'd have 10 colors between 0.0 and 1.0, and also 10 colors between 0.0 and 9.8
-        min_steps = 10
-        #num_volume_scalars = min_steps if scalar_map is None else len(scalar_map)
-        #num_regions = self.get_num_regions()
-
         colors = []
         alphas = []
         lut = vtk.vtkLookupTable()
@@ -483,12 +484,7 @@ class LUTModel:
         if scalar_map is None:
             if color_map is None and self.base_color_map is not None:
                 color_map = self.base_color_map
-        '''
-            target = color_map
-        else:
-            target = scalar_map
-        '''
-        #loop = sort(list(target.keys())) if isinstance(target, dict) else range(num_steps)
+                
         loop = range(num_steps)
         noise = None
         if isinstance(noise_amount, float) and noise_amount > 0:
@@ -496,8 +492,9 @@ class LUTModel:
 
         # Vedo works with nested lists: 
         # [region_id, [r, g, b]] for color, and [region_id, a] for alpha
+
         if scalar_map is None:
-            #scalar_map = np.arange(len(color_map))
+            # Standard volume that is not segmented
             lut.SetRange(s_min, s_max)
             lut.SetNumberOfTableValues(num_steps)
             scalar_lut.SetRange(s_min, s_max)
@@ -518,6 +515,7 @@ class LUTModel:
                 scalar_lut.SetTableValue(r_id, *color, alpha)
                 #scalar_map[r_id] = color_map[r_id]
         else:
+            # Segmented volume
             s_min, s_max = scalar_range
             lut.SetRange(0, num_steps)
             lut.SetNumberOfTableValues(num_steps)
@@ -540,6 +538,8 @@ class LUTModel:
                 lut.SetTableValue(r_id, *color, alpha)
                 
             # Real scalar LUT, mainly as a reference for the user
+            # Here the colors resulting from the given scalar min to max
+            # are assigned to segmented values in the volume
             mock_values = np.linspace(s_min, s_max, num_steps)
             scalar_lut.SetRange(s_min, s_max)
             scalar_lut.SetNumberOfTableValues(len(mock_values))
@@ -548,8 +548,6 @@ class LUTModel:
                 alpha = 0.0 if mock_values[r_id] == 0 and zero_is_transparent else 1.0
                 scalar_lut.SetTableValue(r_id, *color, 1.0)
 
-        #colors = np.array(colors, dtype=object)
-        #alphas = np.array(alphas)
         lut.Build()
         scalar_lut.Build()
 
@@ -1068,10 +1066,10 @@ class VolumeController():
             volume_property.DisableGradientOpacityOn()
         return not disabled
 
-    def get_value_from_xyz(self, position, normal_step=None, avoid_values=0, cast_to_int=True):
+    def get_value_from_xyz(self, position, normal_step=None, avoid_values=0, cast_to_int=True, none_as_zero=False):
         """
         Get a scalar value from the volume with respect to XYZ coordinates and a optionally a normal step,
-        which is the normal on which to probe multiplied by the distance you want to travel further into
+        that is the normal on which to probe multiplied by the distance you want to travel further into
         the volume to pick a correct value. Often the "surface point" on a volume with non uniform transparency
         is at the boundary between transparent (let's say a 0 value is transparent) and more opaque parts.
         So you need to go further into the "cloud" so to speak, in order to find the values you want.
@@ -1084,6 +1082,10 @@ class VolumeController():
         """
         if isinstance(avoid_values, int) or isinstance(avoid_values, float):
             avoid_values = [avoid_values]
+        # TODO: see if this is faster? To be tested
+        # ijk_result = [0.0, 0.0, 0.0]
+        # volume_actor._data.TransformPhysicalPointToContinuousIndex(xyz, ijk_result)
+        # volume_actor._data.GetPoint(ijk_result)
         pt_id = self.actor._data.FindPoint(*position)
         valid_id = 0 < pt_id < self.scalars.GetNumberOfValues()
         value = self.scalars.GetValue(pt_id) if valid_id else None
@@ -1095,13 +1097,14 @@ class VolumeController():
                 value = self.scalars.GetValue(pt_id) if valid_id else None
         if cast_to_int and value is not None:
             value = int(value)
+        if value is None and none_as_zero:
+            value = 0
         return value
 
     def pick(self, origin, screen_position):
         """
-        Find the nearest intersection given a vector formed by two coordinates.
-        This function relies on a trick, using surface meshes to get the proper first intersection
-        and this works with slicers as well.
+        Find the nearest intersection – even on sliced volume – with the ray formed
+        by an origin and a screen-space position (given by VTK when you click on an actor)
         :param origin: Origin of the vector
         :param screen_position: 2D position on screen. This is given by vtk events like MouseRelease
         :return: The nearest position and its related value queried in the volume image
@@ -1118,6 +1121,7 @@ class VolumeController():
 
         closest_dist = distance
         slice_position = None
+        # See if the line hits any of the slicers (that are image planes)
         for slicer_id in self.slicers:
             slicer = self.slicers[slicer_id]
             if slicer.got_slice:
@@ -1127,18 +1131,76 @@ class VolumeController():
                 new_dist = np.linalg.norm(position - hits[0])
                 if new_dist < closest_dist and new_dist < self.model.resolution * 2:
                     closest_dist = new_dist
-                    #print('Found closer position on slice!', slicer_id, np.linalg.norm(hits[0] - origin), distance)
                     slice_position = hits[0]
 
         if slice_position is None:
             position = vol_position
         else:
             position = slice_position
-        value = self.get_value_from_xyz(position, normal * self.model.resolution * 5)
+        value = self.get_value_from_xyz(position, normal * self.model.resolution * 4)
         return position, value
 
-    def probe(self, origin, destination):
-        return self.picker.IntersectVolumeWithLine(np.array(destination) - origin)
+    def add_probe(self, origin, destination, resolution=40, radius=10, color_map=None, 
+                screen_space=True, min_v=None, max_v=None, add_to_scene=True):
+        """
+        Add a series of points along a line probe
+        :param origin: Probe origin
+        :param destination: Probe destination point
+        :param resolution: Number of (equidistant) points that will be probed along that line
+        :param radius: Radius of the points
+        :param color_map: Scalars color map
+        :param screen_space: Whether the points are screen space or spheres
+        :param min_v: Min scalar value
+        :param max_v: Max scalar value
+        :param add_to_scene: Whether the new probe is added to scene
+        :return: Points
+        """
+        if color_map is None:
+            color_map = self.model.luts.current.color_map
+        
+        positions, values = self.probe(origin, destination, resolution)
+
+        points_obj = obj.Points(positions, values=values, radius=radius, screen_space=screen_space,
+                                color_map=color_map, min_v=min_v, max_v=max_v)
+        
+        points_obj.origin = origin
+        points_obj.destination = destination
+        # Dynamic properties assignment
+        points_obj.target = self.actor
+        points_obj.target_controller = self
+
+        if add_to_scene:
+            self.plot.add(points_obj)
+        return points_obj
+
+    def update_probe(self, origin, destination, points_obj):
+        """
+        Update a probe with given start and end points
+        :param origin: Start point
+        :param destination: End point
+        :param points_obj: Points object
+        """
+        resolution = points_obj._polydata.GetPoints().GetNumberOfPoints()
+        positions, values = self.probe(origin, destination, resolution)
+        points_obj.update_data(positions, values)
+
+    def probe(self, origin, destination, resolution=40):
+        """
+        Probe a volume with a line
+        :param origin: Origin of the line probe
+        :param destination: Destination of the line probe
+        :param resolution: Number of point samples along the probe
+        :return: Positions and values
+        """
+        origin = np.array(origin)
+        destination = np.array(destination)
+        distance = np.linalg.norm(destination - origin)
+        ray = destination - origin
+        ray_norm = ray / distance
+        step = distance / resolution
+        positions = [origin + ray_norm * p_id * step for p_id in range(resolution)]
+        values = np.array([self.get_value_from_xyz(point, none_as_zero=True) for point in positions])
+        return positions, values
 
     def set_interactive_subsampling(self, on=False):
         """
@@ -1688,8 +1750,8 @@ class SlicerView():
             Alternatively, we could update the LUT with alpha values but it's a pain.
             
             ctf = self.volume_view.actor.GetProperty().GetRGBTransferFunction()
-            otf = self.volume_view.actor.GetProperty().GetScalarOpacity
             lut = vedo.utils.ctf2lut(self.volume_view.actor)
+            otf = self.volume_view.actor.GetProperty().GetScalarOpacity
 
             # using "ctf" would work only for colors, not for transparency!
             self.apply_lut(ctf)

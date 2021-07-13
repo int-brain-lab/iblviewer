@@ -13,22 +13,25 @@ class Collection(OrderedDict):
         """
         return self.get_keys()[self.current_key_id]
 
-    def set_current(self, key_or_id):
+    def set_current(self, target):
         """
         Set the current data
-        :param key_or_id: A valid key or an int
+        :param key_or_id: A valid key or an int or the data
+        object itself
         """
         keys = self.get_keys()
-        if key_or_id in self:
-            key = key_or_id
-        elif isinstance(key_or_id, int):
-            key_id = key_or_id
+        if target in self:
+            key = target
+        elif isinstance(target, int):
+            key_id = target
             try:
                 key = keys[key_id]
             except Exception:
                 return
         else:
-            return
+            for key in self:
+                if self[key] == target:
+                    break
         
         key_id = 0
         for other_key in keys:
@@ -36,7 +39,7 @@ class Collection(OrderedDict):
                 break
             key_id += 1
         
-        # This is for when you need to know where in the array is the key
+        # This is for when you need to know where is the key in the array
         self.current_key_id = key_id
         self.current = self.get(key)
 
@@ -77,9 +80,9 @@ class Collection(OrderedDict):
         number so that it's unique.
         :param replace_existing: Whether any existing data with the same id is replaced or not
         :param set_current: Whether the newly stored data is set as the current one
-        :return: The final data_id
+        :return: The new data_id or None
         """
-        if data_id is None:
+        if data_id is None or (data_id in self and not replace_existing):
             data_id = self.get_new_name(data)
         if data_id in self and not replace_existing:
             return
@@ -90,7 +93,7 @@ class Collection(OrderedDict):
 
     def get_or_create(self, data_id, data_class=None):
         """
-        Get a data from a dictionary of datas or create it if none found.
+        Get a data from a dictionary of data or create it if none found.
         This method works only with datas that have a name (str) property.
         :param data_id: Either a data name or its id
         :param data_class: The class of the data

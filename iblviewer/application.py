@@ -199,6 +199,7 @@ class ViewerModel:
     points: Collection = field(default_factory=Collection)
     lines: Collection = field(default_factory=Collection)
     surfaces: Collection = field(default_factory=Collection)
+    probes: Collection = field(default_factory=Collection)
     luts: Collection = field(default_factory=Collection)
 
     runtime: datetime = datetime.now()
@@ -266,11 +267,11 @@ class ViewerModel:
             obj_type = ViewerModel.SURFACE
         return obj_type
 
-    def set_selection(self, actor=None, view=None, event=None, camera_position=None):
+    def set_selection(self, actor=None, controller=None, event=None, camera_position=None):
         """
         Define the current object selected
         :param actor: a vtkActor
-        :param view: View of the given actor (optional)
+        :param controller: Controller of the given actor (optional)
         :param event: a vedo event from which we use picked3d and picked2d (we could directly use vtk)
         :param camera_position: position of the camera (optional) at selection time
         """
@@ -294,7 +295,7 @@ class ViewerModel:
         actor_type = self.get_actor_type(actor)
         if event is None:
             self.selection = actor
-            self.selection_controller = view
+            self.selection_controller = controller
             self.selection_type = actor_type
             return
 
@@ -336,17 +337,17 @@ class ViewerModel:
             position = poly.GetPoints().GetPoint(point_id)
 
         elif actor_type == ViewerModel.VOLUME:
-            position, value = view.pick(camera_position, np.array(event.picked2d))
+            position, value = controller.pick(camera_position, np.array(event.picked2d))
             if position is None or value is None:
                 return
-            if view.slicers_selectable:
+            if controller.slicers_selectable:
                 override_selection = False
         
         if camera_position is None:
             camera_position = self.cameras.current.GetPosition()
         
-        if 'volume' in str(type(view)).lower():
-            actor = view.actor
+        if 'volume' in str(type(controller)).lower():
+            actor = controller.actor
 
         if self.selection_point is None and position is not None:
             self.selection_point_changed = True
@@ -355,7 +356,7 @@ class ViewerModel:
             self.selection_point_changed = np.linalg.norm(p1 - position) > 0.1
 
         self.selection = actor
-        self.selection_controller = view
+        self.selection_controller = controller
         self.selection_type = actor_type
         self.selection_point = position
         self.selection_value = value
@@ -447,7 +448,8 @@ class Viewer():
         self.axes_assembly = None
         self.widgets_reflection = dict()
         self.widgets = dict()
-        self.box_cutter = None
+        self.box_widget = None
+        self.line_widget = None
 
         vedo.settings.useDepthPeeling = True
         vedo.settings.useFXAA = True
@@ -459,9 +461,6 @@ class Viewer():
         vedo.settings.allowInteraction = False
         vedo.settings.defaultFont = self.model.ui.font
         vedo.settings.enableDefaultKeyboardCallbacks = False
-
-    def silent(*args, **kwargs):
-        pass
 
     def initialize(self, context=None, embed_ui=False, embed_font_size=16, web_ui=False, jupyter=False, offscreen=None, 
                     plot=None, plot_window_id=0, num_windows=1, render=False, dark_mode=False, auto_select_first_object=True):
@@ -481,8 +480,6 @@ class Viewer():
         :param auto_select_first_object: Auto select the first object displayed
         """
         print('IBL Viewer...')
-
-        vedo.colors.printc = self.silent
 
         self.model.ui.font_size = embed_font_size
         self.model.web_ui = jupyter is True or web_ui is True
@@ -591,6 +588,8 @@ class Viewer():
             # let's change that
             name = self.get_unique_selectable_name(name)
         self.selectable_objects[name] = vtk_object
+        # We overwrite the vtk object's name with the new one
+        vtk_object.name = name
         self.update_selection_slider()
 
     def get_unique_selectable_name(self, name, spacer='_'):
@@ -600,24 +599,24 @@ class Viewer():
         :param spacer: Spacer char
         :return: New name, for instance 'Points_4'
         """
-        similar_ones = []
-        max_value = 0
-        if name not in self.selectable_objects:
-            return name
-        for key in self.selectable_objects:
-            if name in key:
-                similar_ones.append(key)
-                if spacer in key:
-                    value = key.split(spacer)[1]
-                    max_value = max(int(value), max_value)
-        value = max(len(similar_ones), max_value)
-        return f'{name}{spacer}{value}'
+        return utils.get_unique_name(self.selectable_objects, name, spacer)
 
     def unregister_object(self, name):
         """
         Unregister an object from the selectable objects list
-        :param name: Object name or given id
+        :param name: Object name or given id or int or the object itself
         """
+        if isinstance(name, int):
+            keys = list(self.selectable_objects.keys())
+            try:
+                name = keys[name]
+            except Exception:
+                pass
+        elif not isinstance(name, str):
+            for key in self.selectable_objects:
+                if name == self.selectable_objects[key]:
+                    name = key
+                    break
         del self.selectable_objects[name]
         self.update_selection_slider()
 
@@ -797,7 +796,8 @@ class Viewer():
         Handle click and drag
         """
         # Selection is None here
-        self.clear_box_cutter()
+        self.clear_box_widget()
+        self.clear_line_widget()
         self.model.set_selection()
         self.update_info()
         self.set_outline_visibility(False)
@@ -826,7 +826,7 @@ class Viewer():
         view = self.controllers_map.get(actor)
         self.model.set_selection(actor, view, event, camera_position)
         if self.model.selection_changed:
-            self.clear_box_cutter()
+            self.clear_box_widget()
             self.selection_changed()
         elif self.model.selection_point_changed:
             self.sub_selection_changed()
@@ -1336,13 +1336,16 @@ class Viewer():
         self.model.ui.toggle_context(UIModel.OBJECT)
         
         #self.add_button('global_slicer', self.toggle_global_slicer, [x, y+145], ['Global slicer: OFF', 'Global slicer: ON'], toggle=True)
-        self.add_button('hollow_volume', self.toggle_hollow_mode, [x+200, y+40], 'Hollow regions', toggle=True)
-        self.add_button('box_cutter', self.start_box_cutter, [x, y+40], 'Cutter/Slicer')
+        self.add_button('box_widget', self.add_box_widget, [x, y+40], 'Cutter/Slicer')
+        self.add_button('new_probe', self.add_probe, [x+130, y+40])
+        self.add_button('move_probe', self.move_probe, [x+130, y+40])
+        self.add_button('hollow_volume', self.toggle_hollow_mode, [x+240, y+40], 'Hollow regions', toggle=True)
         self.add_slider('opacity', self.update_opacity, 0.0, 1.0, 0.9, [x, y-5, sw], precision=2, **s_kw)
         self.add_slider('slices_opacity', self.update_slices_opacity, 0, 1.0, 0.75, [x+sw+40, y-5, sw], precision=2, **s_kw)
         #self.add_button('slices_visibility', self.toggle_slices_visibility, [x, yb + 130], ["Hide slices", "Show slices"])
 
         '''
+        # Code for adding six sliders for box slicing.
         self.add_slider('-x', self.update_nx_slicer, -1, 0, 0, [x+sw+40, y+70, sw], oid=0, **s_kw)
         self.add_slider('+x', self.update_px_slicer, 0, 1, 0, [x, y+70, sw], oid=1, **s_kw)
 
@@ -1411,9 +1414,16 @@ class Viewer():
         if not self.model.ui.is_object_context():
             return
 
+        volume_mode = isinstance(self.model.selection_controller, VolumeController)
         hollow_button = self.model.ui.get_element('hollow_volume')
-        visible = isinstance(self.model.selection_controller, VolumeController)
-        self.set_element_visibility(hollow_button, visible)
+        self.set_element_visibility(hollow_button, volume_mode)
+
+        new_probe_button = self.model.ui.get_element('new_probe')
+        self.set_element_visibility(new_probe_button, volume_mode)
+
+        probe_mode = self.is_probe(self.model.selection)
+        move_probe_button = self.model.ui.get_element('move_probe')
+        self.set_element_visibility(move_probe_button, probe_mode)
 
         slider = self.widgets.get('opacity')#self.model.ui.get_element('opacity')
         opacity_value = None
@@ -1538,16 +1548,21 @@ class Viewer():
             self.set_color_bar_visibility(True)
             self.plot.remove(self.scalar_bar, render=False)
         ui = self.model.ui
-        view = self.model.selection_controller
-        if self.model.selection is None:
+        selection = self.model.selection
+        controller = self.model.selection_controller
+        if selection is None:
             return
         lut = None
-        if view is not None and hasattr(view.model, 'luts') and view.model.luts.current is not None:
-            lut = view.model.luts.current.scalar_lut
-        if lut is None and isinstance(view, VolumeController):
-            lut = vedo.utils.ctf2lut(view.actor)
+        if self.is_probe(selection):
+            controller = selection.target_controller
+        if controller is not None and hasattr(controller.model, 'luts'):
+            if controller.model.luts.current is not None:
+                lut = controller.model.luts.current.scalar_lut
+        if lut is None and isinstance(controller, VolumeController):
+            lut = vedo.utils.ctf2lut(controller.actor)
         elif lut is None:
-            lut = self.model.selection.mapper().GetLookupTable()
+            # Default way to get a LUT for the scalar/color bar
+            lut = selection.mapper().GetLookupTable()
         if lut is None:
             return
         if self.scalar_bar is not None:
@@ -1732,7 +1747,8 @@ class Viewer():
         else:
             return np.array([[x, y], [x, y + length]])
 
-    def add_slider(self, name, event_handler, min_value, max_value, value, pos, title=None, oid=None, precision=0, context=None, **kwargs):
+    def add_slider(self, name, event_handler, min_value, max_value, value, pos, 
+                    title=None, oid=None, precision=0, context=None, **kwargs):
         """
         Add a slider to the UI
         :param event_handler: Event handler function called when the slider is updated
@@ -1830,25 +1846,101 @@ class Viewer():
                 widget.GetRepresentation().SetValue(value)
         return value
             
-    def start_box_cutter(self):
+    def add_probe(self):
         """
-        Start the box cutter widget
+        Add a new probe widget
         """
-        self.clear_box_cutter()
+        self.clear_line_widget()
+        event_handler = None
+        controller = self.model.selection_controller
+        if isinstance(controller, VolumeController):
+            event_handler = self.update_current_probe
+            self.line_widget = utils.probe(self.plot, self.model.selection, 
+                                            self.line_widget, event_handler)
+            pt1 = self.line_widget.GetPoint1()
+            pt2 = self.line_widget.GetPoint2()
+            probe = controller.add_probe(pt1, pt2)
+            self.register_object(probe)
+            self.model.probes.store(probe, probe.name, replace_existing=False, set_current=True)
+        '''
+        # If later interested in this, a generic approach to surface mesh data probing
+        // Get the ID of the point that is closest to the query position
+        vtkIdType id = locator->FindClosestPoint(pt);
+        // Retrieve the first attribute value from this point
+        double value = polyData->GetPointData()->GetScalars()->GetTuple(id, 0);
+        '''
+
+    def is_probe(self, probe):
+        """
+        Check if an object is (the result of) a probe
+        :param probe: Probe object
+        :return: Boolean
+        """
+        target = hasattr(probe, 'target_controller') and hasattr(probe, 'target')
+        points = hasattr(probe, 'origin') and hasattr(probe, 'destination')
+        return target and points
+
+    def update_current_probe(self, widget=None, event=None):
+        """
+        Update the current probe
+        :param widget: vtkLineWidget
+        :param event: vtkEvent
+        """
+        if widget is None:
+            widget = self.line_widget
+        if widget is None:
+            return
+        obj = self.model.probes.current
+        volume_controller = obj.target_controller
+        # Probe method is within VolumeController
+        volume_controller.update_probe(widget.GetPoint1(), widget.GetPoint2(), obj)
+
+    def move_probe(self, probe=None):
+        """
+        Move an existing probe
+        """
+        if probe is None:
+            probe = self.model.selection
+        if probe is None:
+            return
+        if self.is_probe(probe):
+            # The event handler in this case will refer to the active probe in
+            # self.model.probes.current so we have to set it
+            self.model.probes.set_current(probe) # or probe.name works too
+            event_handler = self.update_current_probe
+            self.line_widget = utils.probe(self.plot, probe, self.line_widget, event_handler, 
+                                            probe.origin, probe.destination)
+
+    def clear_line_widget(self):
+        """
+        Clear the active line widget
+        """
+        if self.line_widget is not None:
+            self.line_widget.Off()
+            #self.line_widget.RemoveObservers('InteractionEvent')
+            #self.plot.widgets.remove(self.line_widget)
+            
+    def add_box_widget(self):
+        """
+        Add a box widget for clipping the selected object
+        """
+        self.clear_box_widget()
         if self.model.selection is not None:
             event_handler = None
             if isinstance(self.model.selection_controller, VolumeController):
                 event_handler = self.model.selection_controller.box_cutter_update
-            self.box_cutter = utils.box_cutter(self.plot, self.model.selection, event_handler)
+            self.box_widget = utils.box_widget(self.plot, self.model.selection, event_handler)
 
-    def clear_box_cutter(self):
+    def clear_box_widget(self):
         """
-        Clear the active box cutter
+        Clear the active box widget
         """
-        if self.box_cutter is not None:
-            self.box_cutter.Off()
-            self.plot.widgets.remove(self.box_cutter)
-            self.box_cutter = None
+        if self.box_widget is not None:
+            self.box_widget.Off()
+            self.box_widget.RemoveObservers('InteractionEvent')
+            self.plot.widgets.remove(self.box_widget)
+            self.plot.interactor.Render()
+            self.box_widget = None
         
     def update_px_slicer(self, widget=None, event=None, value=0.0):
         """
@@ -2216,6 +2308,8 @@ class Viewer():
         """
         if widget is not None and event is not None:
             value = widget.GetRepresentation().GetValue()
+        if self.model.selection is None:
+            return
         self.model.selection.SetVisibility(value > 0)
         if isinstance(self.model.selection_controller, VolumeController):
             self.model.selection_controller.set_opacity_unit(value)
@@ -2255,6 +2349,8 @@ class Viewer():
         :param loop: Whether next() goes to 0 when it reached the end of the time series or not
         :return: Returns whether the next time series is valid (within range of the time series)
         """
+        if self.model.selection is None:
+            return
         # TODO: handle the case where the last value could be invalid if selection changes
         self.set_time_series(self.last_time_series_value - offset)
 
@@ -2265,6 +2361,8 @@ class Viewer():
         :param loop: Whether next() goes to 0 when it reached the end of the time series or not
         :return: Returns whether the next time series is valid (within range of the time series)
         """
+        if self.model.selection is None:
+            return
         self.set_time_series(self.last_time_series_value + offset)
 
         # TODO: below code would require that the slider min-max is set on object selection

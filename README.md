@@ -1,13 +1,16 @@
 # IBL Viewer
-The IBL Viewer is a simple and fast interactive visualization tool based on VTK that uses GPU accelerated volume and surface rendering. It runs on python 3.8+ and it can be embed in Jupyter Lab/Notebook and Qt user interfaces.
+The International Brain Laboratory Viewer is a simple and fast 3D interactive visualization tool based on VTK that uses GPU accelerated volume and surface rendering. It runs on python 3.8+ and it can be embed in Jupyter Lab/Notebook and Qt user interfaces.
 
-At the International Brain Laboratory, this tool is used by scientists for data/models analysis. From electrophysiological data to neuronal connectivity, this tool allows simple and effective 3D visualization for many use-cases like multi-slicing and time series (even on volumes).
+Most of the viewer makes VTK usable as an interactive application and you may use it as such. Just use `from iblviewer.application import Viewer`
+
+The small added part related to IBL allows scientists to view their data and models for further analysis. From electrophysiological data to neuronal connectivity, this tool allows simple and effective 3D visualization for many use-cases like multi-slicing and time series even on volumes. In that case, you will use `from iblviewer.mouse_brain import MouseBrainViewer`
 
 ## Installation
 ```bash
 pip install git+https://github.com/int-brain-lab/iblviewer.git
 ```
 
+## Installation related to IBL
 If you wish to use this viewer with International Brain Laboratory data sets and libraries, you will need ibllib:
 ```bash
 pip install ibllib

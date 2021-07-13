@@ -23,6 +23,28 @@ def get_type(element):
     :return: String
     """
     return str(element.__class__.__name__).lower()
+
+
+def get_unique_name(collection, name, spacer='_'):
+    """
+    Create a unique key for a collection by appending numbers when entries exist
+    :param collection: A list, collection, array, ...
+    :param name: Name (for instance 'Points')
+    :param spacer: Spacer char
+    :return: New name, for instance 'Points_4'
+    """
+    similar_ones = []
+    max_value = 0
+    if name not in collection:
+        return name
+    for key in collection:
+        if name in key:
+            similar_ones.append(key)
+            if spacer in key:
+                value = key.split(spacer)[1]
+                max_value = max(int(value), max_value)
+    value = max(len(similar_ones), max_value)
+    return f'{name}{spacer}{value}'
     
 
 def numpy2vtk(arr, dtype=None, deep=True, name=""):
@@ -320,10 +342,57 @@ def get_transformation_matrix(origin, normal):
     return M, T
 
 
-def box_cutter(plot, target, interaction_callback=None, place_factor=1, 
+def probe(plot, target, widget=None, interaction_callback=None, point1=None, point2=None, 
+            place_factor=1, handle_size=0.005, color=None):
+    """
+    Initializes a line widget on the given target
+    :param plot: vtk plot
+    :param target: Target object
+    :param widget: Existing widget. In case a valid vtkLineWidget is given,
+    it will be used and modified directly
+    :param interaction_callback: Function that will be called every
+    time there is an interaction with the widget. That's where
+    you set the clipping planes to the object for instance
+    :param point1: Initial position of point 1
+    :param point2: Initial position of point 2
+    :param place_factor: see vtkBoxWidget.setPlaceFactor()
+    :param handle_size: set the relative handle size, see vtkBoxWidget.SetHandleSize()
+    :param color: Color of the line
+    :return: vtkLineWidget
+    """
+    existing = isinstance(widget, vtk.vtkLineWidget)
+    if not existing:
+        widget = vtk.vtkLineWidget()
+        widget.SetInteractor(plot.interactor)
+        widget.SetPlaceFactor(place_factor)
+        widget.SetHandleSize(handle_size)
+    widget.SetInputData(target.inputdata())
+    
+    if color is None:
+        color = [0.5, 0.5, 0.5]
+    widget.GetSelectedLineProperty().SetColor(*color)
+    #widget.GetSelectedLineProperty().SetOpacity(0.7)
+    if point1 is not None and point2 is not None:
+        widget.PlaceWidget()
+        widget.SetPoint1(*point1)
+        widget.SetPoint2(*point2)
+    else:
+        widget.PlaceWidget(target.GetBounds())
+
+    if interaction_callback is not None:
+        widget.RemoveObservers('InteractionEvent')
+        widget.AddObserver('InteractionEvent', interaction_callback)
+
+    plot.interactor.Render()
+    widget.On()
+    plot.widgets.append(widget)
+    return widget
+
+
+def box_widget(plot, target, interaction_callback=None, place_factor=1, 
                 handle_size=0.005, outline_color=None):
     """
-    Initializes a boxWidget that will cut the volume.
+    Initializes a box widget on the given target
     :param plot: vtk plot
     :param target: Target object
     :param interaction_callback: Function that will be called every
@@ -331,8 +400,8 @@ def box_cutter(plot, target, interaction_callback=None, place_factor=1,
     you set the clipping planes to the object for instance
     :param place_factor: see vtkBoxWidget.setPlaceFactor()
     :param handle_size: set the relative handle size, see vtkBoxWidget.SetHandleSize()
-    :return: Widget. Note that this function returns the Widget
-    only when you are done interacting with it if start param is True
+    :param outline_color: Color of the outline
+    :return: vtkBoxWidget
     """
     widget = vtk.vtkBoxWidget()
     widget.SetInteractor(plot.interactor)
@@ -343,6 +412,8 @@ def box_cutter(plot, target, interaction_callback=None, place_factor=1,
     # are axis-aligned, or using vtkImageReslice. Everything is coded
     # in VolumeView already.
     widget.RotationEnabledOff()
+    widget.ScalingEnabledOn()
+    widget.TranslationEnabledOn()
     widget.SetInputData(target.inputdata())
     plot.cutterWidget = widget
     
@@ -376,24 +447,24 @@ def box_cutter(plot, target, interaction_callback=None, place_factor=1,
     if interaction_callback is None:
         interaction_callback = clip_target
     
-    widget.AddObserver("InteractionEvent", interaction_callback)
+    widget.AddObserver('InteractionEvent', interaction_callback)
     plot.interactor.Render()
     widget.On()
     plot.widgets.append(widget)
     return widget
 
 
-def update_scalar_bar(sb, lut, useAlpha=False):
+def update_scalar_bar(sb, lut, use_alpha=False, nan_color=None):
     """
     Update a scalar bar with a new LUT
     :param sb: vtkScalarBarActor
     :param lut: vtkLookupTable
-    :param useAlpha: whether alpha is used in the scalar bar
+    :param use_alpha: whether alpha is used in the scalar bar
     """
     if sb.GetLookupTable() == lut:
         return
     sb.SetLookupTable(lut)
-    sb.SetUseOpacity(useAlpha)
+    sb.SetUseOpacity(use_alpha)
     sb.SetDrawFrame(0)
     sb.SetDrawBackground(0)
     if lut.GetUseBelowRangeColor():
@@ -402,20 +473,21 @@ def update_scalar_bar(sb, lut, useAlpha=False):
     if lut.GetUseAboveRangeColor():
         sb.DrawAboveRangeSwatchOn()
         sb.SetAboveRangeAnnotation('')
-    if lut.GetNanColor() != (0.5, 0.0, 0.0, 1.0):
+    if nan_color is not None:#lut.GetNanColor() != (0.5, 0.0, 0.0, 1.0):
+        lut.SetNanColor(*nan_color)
         sb.DrawNanAnnotationOn()
         sb.SetNanAnnotation('nan')
 
 
 def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYOffset=15, titleFontSize=12,
-                    size=(None,None), nlabels=None, horizontal=False, useAlpha=False):
+                    size=(None,None), nlabels=None, horizontal=False, use_alpha=False):
     """
     Create a new 2D scalar bar. This is a modified method from vedo.addons.addScalarBar
     :param lut: Color map LUT
     :param list pos: fractional x and y position in the 2D window
     :param list size: size of the scalarbar in pixel units (width, heigth)
     :param int nlabels: number of numeric labels to be shown
-    :param bool useAlpha: retain trasparency in scalarbar
+    :param bool use_alpha: retain trasparency in scalarbar
     :param bool horizontal: show in horizontal layout
     """
     if isinstance(font_color, str):
@@ -424,7 +496,7 @@ def add_scalar_bar(lut, pos=(0.8, 0.05), font_color=[0, 0, 0], title="", titleYO
     sb.SetLabelFormat('%-#6.4g')
     #print(sb.GetLabelFormat())
     sb.SetLookupTable(lut)
-    sb.SetUseOpacity(useAlpha)
+    sb.SetUseOpacity(use_alpha)
     sb.SetDrawFrame(0)
     sb.SetDrawBackground(0)
     if lut.GetUseBelowRangeColor():
