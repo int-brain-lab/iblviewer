@@ -56,6 +56,7 @@ class VolumeModel:
 
     luts: Collection = field(default_factory=Collection)
     slicers: Collection = field(default_factory=Collection)
+    isosurfaces: Collection = field(default_factory=Collection)
 
     interactive_subsampling: bool = True
     volume_visible: bool = True
@@ -603,7 +604,6 @@ class VolumeController():
         self.picker = None
         self.scalars = None
         self.mask = None
-        self.isosurfaces = {}
         self.bounding_mesh = None
         self.alpha_unit_upper_offset = alpha_unit_upper_offset
         self.alpha_factor = 0.001 # * self.model.resolution
@@ -630,8 +630,8 @@ class VolumeController():
             actor = self.slicers[slicer_id].actor
             if actor is not None:
                 actors.append(actor)
-        for iso_id in self.isosurfaces:
-            actors.append(self.isosurfaces[iso_id])
+        for iso_id in self.model.isosurfaces:
+            actors.append(self.model.isosurfaces[iso_id])
         actors.append(self.actor)
         return actors
 
@@ -1005,7 +1005,7 @@ class VolumeController():
         self.set_alpha_map(alpha_map)
         
         if lut is not None:
-            for surface in self.isosurfaces:
+            for surface in self.model.isosurfaces:
                 surface._mapper.SetLookupTable(lut.opaque_lut)
             for slicer_id in self.slicers:
                 slicer = self.slicers[slicer_id]
@@ -1263,16 +1263,11 @@ class VolumeController():
         #test.alpha(0.8)
         #actor = thresholded_volume.isosurface(1)
 
-    def build_surface(self, label, exceptions=[0], force_rebuild=False):
+    def isosurface(self, label, max_label=None, exceptions=[0], force_rebuild=False, set_current=True, to_int=True):
         """
-        Creates a surface mesh (isosurface) of a volume for the given value.
+        Creates a surface mesh (isosurface) of a segmented/labelled volume for the given value.
         Unlike general isosurfacing, this method thresholds the volume to the desired
-        label (by making a copy of it, yes it's slow but can't do it otherwise...) 
-        and then uses vtkFlyingEdges3d to extract the surface of the desired region/label/segmentation.
-        This is the only way to extract a specific label because regular isosurfacing includes
-        everything below the given value, which is clearly unwanted in segmented volumes.
-        The raw result needs some smoothing in general but that is left to other methods.
-        
+        label and then extracts the surface mesh of the desired region/label/segmentation.
         :param label: Label (scalar) value found in the volume
         :param exceptions: If the label is found in the exceptions list, isosurfacing will not occur
         :param force_rebuild: Whether rebuilding is forced in case we find an existing mesh for the given label
@@ -1280,64 +1275,62 @@ class VolumeController():
         """
         if label is None or label in exceptions:
             return
-        if self.isosurfaces.get(label) is not None:
-            return self.isosurfaces.get(label)
+        if to_int:
+            label = int(label)
+        existing_mesh = self.model.isosurfaces.get(label)
+        if existing_mesh is not None and not force_rebuild:
+            return existing_mesh
 
-        iso_surface = vtk.vtkFlyingEdges3D()
-        iso_surface.ComputeNormalsOn()
-        iso_surface.ComputeScalarsOn()
-        
         lut = self.model.luts.current
-        # TODO: replace lut.scalar_min with actual value from LUT
-        min_value = lut.scalar_min
-        clone = self.actor.clone()
-        #thresholded_volume = clone.threshold(label, label, replaceOut=-min_value-1)
-        clone_threshold = vtk.vtkImageThreshold()
-        clone_threshold.ThresholdBetween(label, label)
-        clone_threshold.SetOutValue(-min_value-1)
-        clone_threshold.SetInputData(clone.imagedata())
-        '''
-        radius = 1
-        std_deviation = 2.0
-        gaussian = vtk.vtkImageGaussianSmooth()
-        gaussian.SetStandardDeviations(std_deviation, std_deviation, std_deviation)
-        gaussian.SetRadiusFactors(radius, radius, radius)
-        gaussian.SetInputConnection(clone_threshold.GetOutputPort())
-        '''
-        iso_surface.SetInputConnection(clone_threshold.GetOutputPort())
-        #iso_surface.SetInputData(thresholded_volume.imagedata())
-        iso_surface.SetValue(0, label)
-        iso_surface.Update()
-        poly = iso_surface.GetOutput()
 
-        '''
-        decimate = vtk.vtkDecimatePro()
-        decimate.SetInputConnection(iso_surface.GetOutputPort())
-        decimate.SetTargetReduction(0.1)
-        decimate.Update()
+        # Generate object boundaries from labelled volume 
+        discrete = vtk.vtkDiscreteMarchingCubes()
+        discrete.SetInputData(self.actor.imagedata())
+        discrete.GenerateValues(1, label, label)
 
-        smoothing_iterations = 100
-        pass_band = 0.5
-        feature_angle = 80.0
+        smoothing_iterations = 15
+        pass_band = 0.001
+        feature_angle = 120.0
+
         smoother = vtk.vtkWindowedSincPolyDataFilter()
-        smoother.SetInputConnection(decimate.GetOutputPort())
+        smoother.SetInputConnection(discrete.GetOutputPort())
         smoother.SetNumberOfIterations(smoothing_iterations)
         smoother.BoundarySmoothingOff()
         smoother.FeatureEdgeSmoothingOff()
         smoother.SetFeatureAngle(feature_angle)
         smoother.SetPassBand(pass_band)
         smoother.NonManifoldSmoothingOn()
-        smoother.NormalizeCoordinatesOff()
+        smoother.NormalizeCoordinatesOn()
         smoother.Update()
 
-        poly = smoother.GetOutput()
         '''
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputConnection(smoother.GetOutputPort())
+        mapper.SetLookupTable(lut.scalar_lut)
+        mapper.SetScalarRange(min_value, lut.scalar_max)
+        '''
+        #min_value = lut.scalar_min
+        
+        simple_lut = vtk.vtkLookupTable()
+        simple_lut.SetNumberOfColors(1)
+        simple_lut.SetTableRange(0, 1)
+        simple_lut.SetScaleToLinear()
+        simple_lut.SetTableValue(0, 0, 0, 0, 0)
+        simple_lut.SetTableValue(1, *lut.mapped_lut.GetTableValue(label))
+        simple_lut.Build()
+
+        poly = smoother.GetOutput()
         actor = vedo.Mesh(poly)
-        actor._mapper.SetScalarRange(min_value, lut.scalar_max)
-        actor._mapper.SetLookupTable(lut.opaque_table)
+        #actor._mapper.SetScalarRange(min_value, lut.scalar_max)
+        #actor._mapper.SetUseLookupTableScalarRange(True)
+        actor._mapper.SetLookupTable(simple_lut)
         actor._mapper.ScalarVisibilityOn()
-        actor.name = 'Isosurface ' + str(label)
-        self.isosurfaces[label] = actor
+        actor.name = 'Isosurface_' + str(label)
+        #actor.cmap(lut.scalar_lut, np.ones(poly.GetNumberOfVerts())*label)
+
+        self.model.isosurfaces[label] = actor
+        if set_current:
+            self.model.isosurfaces.set_current(label)
         return actor
 
 

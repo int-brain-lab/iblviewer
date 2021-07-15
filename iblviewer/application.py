@@ -4,6 +4,7 @@ from datetime import datetime
 from collections import OrderedDict
 import logging
 import math
+from k3d.factory import volume
 import numpy as np
 from vedo.colors import colorMap
 
@@ -1157,6 +1158,18 @@ class Viewer():
             self.view_selected()
         return controller
 
+    def remove_object(self, target=None):
+        """
+        Remove an object from the plot
+        """
+        if target is None:
+            target = self.model.selection
+        if target is None:
+            return
+        self.plot.remove(target)
+        self.model.set_selection(None)
+        self.update_ui()
+
     def toggle_menu(self, name=None, context=None):
         """
         Toggle menu and activate only one button in the set
@@ -1337,9 +1350,10 @@ class Viewer():
         
         #self.add_button('global_slicer', self.toggle_global_slicer, [x, y+145], ['Global slicer: OFF', 'Global slicer: ON'], toggle=True)
         self.add_button('box_widget', self.add_box_widget, [x, y+40], 'Cutter/Slicer')
-        self.add_button('new_probe', self.add_probe, [x+130, y+40])
-        self.add_button('move_probe', self.move_probe, [x+130, y+40])
-        self.add_button('hollow_volume', self.toggle_hollow_mode, [x+240, y+40], 'Hollow regions', toggle=True)
+        self.add_button('remove_object', self.remove_object, [x+130, y+40])
+        self.add_button('isosurface', self.add_current_isosurface, [x+280, y+40])
+        #self.add_slider('isosurface', self.update_isosurface, 0, 1200, 200, [x+2*sw+80, y-5, sw], precision=2, **s_kw)
+        self.add_button('hollow_volume', self.toggle_hollow_mode, [x+380, y+40], 'Hollow regions', toggle=True)
         self.add_slider('opacity', self.update_opacity, 0.0, 1.0, 0.9, [x, y-5, sw], precision=2, **s_kw)
         self.add_slider('slices_opacity', self.update_slices_opacity, 0, 1.0, 0.75, [x+sw+40, y-5, sw], precision=2, **s_kw)
         #self.add_button('slices_visibility', self.toggle_slices_visibility, [x, yb + 130], ["Hide slices", "Show slices"])
@@ -1369,6 +1383,8 @@ class Viewer():
         self.add_slider('data_time_series', self.update_time_series, 0, 1, 0, [x, y-5, sw], **s_kw)
         self.add_button('play_time_series', self.play_time_series, [x, y+40], 
                         ['Play time series', 'Pause time series'], toggle=True)
+        self.add_button('new_probe', self.add_probe, [x+180, y+40])
+        self.add_button('move_probe', self.move_probe, [x+180, y+40])
         self.model.ui.toggle_context(UIModel.DATA)
         
     def add_video_export_embed_ui(self, x, y, sw):
@@ -1415,15 +1431,8 @@ class Viewer():
             return
 
         volume_mode = isinstance(self.model.selection_controller, VolumeController)
-        hollow_button = self.model.ui.get_element('hollow_volume')
-        self.set_element_visibility(hollow_button, volume_mode)
-
-        new_probe_button = self.model.ui.get_element('new_probe')
-        self.set_element_visibility(new_probe_button, volume_mode)
-
-        probe_mode = self.is_probe(self.model.selection)
-        move_probe_button = self.model.ui.get_element('move_probe')
-        self.set_element_visibility(move_probe_button, probe_mode)
+        self.set_element_visibility(self.model.ui.get_element('hollow_volume'), volume_mode)
+        self.set_element_visibility(self.model.ui.get_element('view_region'), volume_mode)
 
         slider = self.widgets.get('opacity')#self.model.ui.get_element('opacity')
         opacity_value = None
@@ -1473,6 +1482,13 @@ class Viewer():
         """
         if not self.model.ui.is_data_context():
             return
+
+        volume_mode = isinstance(self.model.selection_controller, VolumeController)
+        self.set_element_visibility(self.model.ui.get_element('new_probe'), volume_mode)
+
+        probe_mode = self.is_probe(self.model.selection)
+        self.set_element_visibility(self.model.ui.get_element('move_probe'), probe_mode)
+
         slider = self.widgets.get('data_time_series')
         view = self.model.selection_controller
         max_value = 0
@@ -1845,6 +1861,31 @@ class Viewer():
             if widget is not None:
                 widget.GetRepresentation().SetValue(value)
         return value
+    
+    def add_current_isosurface(self):
+        """
+        Add the current isosurface
+        :param widget: The slider widget (optional)
+        :param event: The slider event (optional)
+        :param value: The value to set. If None, then the slider value
+        is used, if it's given as widget param
+        """
+        self.isosurface(value=self.model.selection_value)
+
+    def isosurface(self, volume_controller=None, value=None):
+        """
+        Generate an iso surface mesh for a given value
+        """
+        if volume_controller is None:
+            volume_controller = self.model.selection_controller
+        if volume_controller is None:
+            return
+        current_mesh = volume_controller.model.isosurfaces.current
+        self.plot.remove(current_mesh)
+        mesh = volume_controller.isosurface(value)
+        if mesh is None:
+            return
+        self.plot.add(mesh)
             
     def add_probe(self):
         """
