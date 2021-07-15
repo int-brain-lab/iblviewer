@@ -34,12 +34,11 @@ LUT_VERSION = 'v01' # version 01 is the lateralized version
 
 class AllenAtlasExt(ibllib.atlas.AllenAtlas):
     """
-    -----------
     This overwrites the constructor of AllenAtlas that is not designed to be used for the
     public, that is people outside of IBL. Typically, you'd want to display the Allen volume 
     data in this viewer and perform additional tasks (such as loading your own extra data) 
     with other libraries. Dev note: I'm forced to copy and modify the whole constructor in this case.
-    -----------
+
     Instantiates an atlas.BrainAtlas corresponding to the Allen CCF at the given resolution
     using the IBL Bregma and coordinate system
     """
