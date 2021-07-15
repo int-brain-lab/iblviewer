@@ -181,7 +181,7 @@ class IBLAtlasModel():
         """
         Get a VolumeModel instance that represents the atlas (segmented) volume
         :param atlas_mapping: IBL Mapping that we want to use on this atlas.
-        See ibllib.atlas.AllenAtlas.regions.mappings.keys()
+            See ibllib.atlas.AllenAtlas.regions.mappings.keys()
         :return: VolumeModel
         """
         if self.atlas is None:
@@ -297,8 +297,8 @@ class IBLAtlasModel():
         Load a volume data file. Supports NRRD and many other formats thanks to vedo/VTK
         :param file_path: Volume file path. Could support other file types easily.
         :param remap_scalars: Whether scalar values in the volume are replaced by 
-        their row id from a mapping that stores. This is necessary in the case of segmented
-        volumes with regions that have a discontinuous id.
+            their row id from a mapping that stores. This is necessary in the case of segmented
+            volumes with regions that have a discontinuous id.
         :param mapping: Pandas Series or a Dictionary
         :param make_current: Set the volume data as the current one
         :return: 3D array
@@ -318,7 +318,7 @@ class IBLAtlasModel():
         :param volume: Given volume to display
         :param atlas_mapping: Mapping, either a string for the name of the mapping or an integer. 
         :param ibl_back_end: If you are not using ibllib and want to load your own volume, set this to False
-        so that there will be no transposition of the volume (needed for the ones from IBL)
+            so that there will be no transposition of the volume (needed for the ones from IBL)
         :return: Volume nd array
         """
         volume_data = None
@@ -356,7 +356,7 @@ class IBLAtlasModel():
         Build an alpha map that reveals only the given region ids
         :param region_ids: List or numpy array of region ids
         :param alpha_map: Optional alpha map that will be modified. If None provided, the method will attempt
-        to use the current active alpha map
+            to use the current active alpha map
         :return: 2D numpy array with region ids and corresponding alpha values
         """
         if alpha_map is None:
@@ -395,18 +395,18 @@ class MouseBrainViewer(Viewer):
         """
         Initialize the controller, main entry point to the viewer
         :param resolution: Resolution of the atlas volume.
-        Possible values are 10 (requires a lot of RAM), 25, 50, 100. Units are in microns
+            Possible values are 10 (requires a lot of RAM), 25, 50, 100. Units are in microns
         :param mapping: Optional mapping value. In the context of IBL, there is 'Allen' for the standard Allen map
-        and 'Beryl' (random name) which aggregates cortical layers as one.
+            and 'Beryl' (random name) which aggregates cortical layers as one.
         :param add_atlas: Whether the Atlas is included in the viewer
         :param add_dwi: Whether the diffusion weighted imaging is loaded in the viewer (same boundaries as atlas)
         :param context: Context of the visualization
         :param embed_ui: Whether the UI is embed within the VTK window
-        :parma embed_font_size: Embed font size. Defaults to 16 points. You might need larger values
-        in case you have a small screen with high dpi (but VTK methods fail to detect that).
+        :param embed_font_size: Embed font size. Defaults to 16 points. You might need larger values
+            in case you have a small screen with high dpi (but VTK methods fail to detect that).
         :param jupyter: Whether we're running from a jupyter notebook or not
         :param plot: A vedo Plotter instance. You can either create it by yourself before hand, in case you want
-        to have multiple windows with other stats or let the controller create a new one
+            to have multiple windows with other stats or let the controller create a new one
         :param plot_window_id: Sub-window id where the 3D visualization will be displayed
         :param num_windows: Number of subwindows, in case you want to display your own stuff later
         :param render: Whether rendering occurs at the end of the initialization or not. Defaults to False
@@ -542,25 +542,25 @@ class MouseBrainViewer(Viewer):
         Add new points as circles or spheres
         :param positions: 3D array of coordinates
         :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
-        in case as_spheres is False.
+            in case as_spheres is False.
         :param values: 1D array of values, one per neuron or a time series of such 1D arrays (numpy format)
         :param color_map: A color map, it can be a color map built by IBLViewer or 
-        a color map name (see vedo documentation), or a list of values, etc.
+            a color map name (see vedo documentation), or a list of values, etc.
         :param name: All point neurons are grouped into one object, you can give it a custom name
         :param screen_space: Type of point, if True then the points are static screen-space points.
-        If False, then the points are spheres. You see them larger when you zoom closer to them,
-        while this is not the case with screen-space points. Defaults to False.
-        :parma use_origin: Whether the origin is added as offset to the given positions
+            If False, then the points are spheres. You see them larger when you zoom closer to them,
+            while this is not the case with screen-space points. Defaults to False.
+        :param use_origin: Whether the origin is added as offset to the given positions
         :param noise_amount: Amount of 3D random noise applied to each point. Defaults to 0
         :param as_spheres: Whether the points are spheres, which means their size is relative to 
-        the 3D scene (they will get bigger if you move the camera closer to them). On the other hand,
-        if points are rendered as points, their radius in pixels will be constant, however close or
-        far you are from them (which can lead to unwanted visual results)
+            the 3D scene (they will get bigger if you move the camera closer to them). On the other hand,
+            if points are rendered as points, their radius in pixels will be constant, however close or
+            far you are from them (which can lead to unwanted visual results)
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param bounding_mesh: A closed manifold surface mesh used for trimming segments. If None,
-        the current self.bounding_mesh is used (if it exists)
+            the current self.bounding_mesh is used (if it exists)
         :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
-        on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+            on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
         :return: objects.Points
         """
         axes = [1, 1, 1]
@@ -593,21 +593,21 @@ class MouseBrainViewer(Viewer):
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
         :param color_map: A color map, it can be a color map built by IBLViewer or 
-        a color map name (see vedo documentation), or a list of values, etc.
+            a color map name (see vedo documentation), or a list of values, etc.
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param relative_end_points: Whether the given end point is relative to the start point. False by default,
-        except is spherical coordinates are given
+            except is spherical coordinates are given
         :param spherical_angles: 3D numpy array of spherical angle data of length n 
-        In case end_points is None, this replaces end_points by finding the relative
-        coordinate to each start point with the given radius/depth, theta and phi
+            In case end_points is None, this replaces end_points by finding the relative
+            coordinate to each start point with the given radius/depth, theta and phi
         :param radians: Whether the given spherical angle data is in radians or in degrees
         :param trim_outliers: Whether segments are cropped by the bounding mesh
         :param bounding_mesh: A closed manifold surface mesh used for trimming segments. If None,
-        the current self.bounding_mesh is used (if it exists)
+            the current self.bounding_mesh is used (if it exists)
         :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
-        on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+            on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
         :return: objects.Lines
         """
         axes = [1, 1, 1]
@@ -637,15 +637,15 @@ class MouseBrainViewer(Viewer):
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
         :param color_map: A color map, it can be a color map built by IBLViewer or 
-        a color map name (see vedo documentation), or a list of values, etc.
+            a color map name (see vedo documentation), or a list of values, etc.
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param trim_outliers: Whether segments that are out of the brain envelope are trimmed or not. True by default
         :param bounding_mesh: A closed manifold surface mesh used for trimming lines. If None,
-        the current self.bounding_mesh is used (if it exists)
+            the current self.bounding_mesh is used (if it exists)
         :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
-        on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+            on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
         :return: objects.Lines
         """
         axes = [1, 1, 1]
@@ -697,17 +697,17 @@ class MouseBrainViewer(Viewer):
         """
         Add a volume to the viewer with box clipping and slicing enabled by default
         :param data: Volume image data or a file_path
-        :parma resolution: Resoluton of the volume
+        :param resolution: Resoluton of the volume
         :param file_path: File path of the volume. If you don't provide an image volume data,
-        then the file_path will be used to load the volume data
+            then the file_path will be used to load the volume data
         :param color_map: Color map for the volume
-        :parma alpha_map: Alpha map for the volume. If None, it will assume that 0 values
-        are transparent and maximum values are opaque
+        :param alpha_map: Alpha map for the volume. If None, it will assume that 0 values
+            are transparent and maximum values are opaque
         :param select: Whether the volume is selected
         :param add_to_scene: Whether the volume is added to scene
         :param transpose: Transposition parameter. If None. nothing happens. If True, 
-        then the default IBL transposition is applied. You can provide your own, that is,
-        a list of 3 elements to reorder the volume as desired.
+            then the default IBL transposition is applied. You can provide your own, that is,
+            a list of 3 elements to reorder the volume as desired.
         :return: VolumeController
         """
         if transpose == True:

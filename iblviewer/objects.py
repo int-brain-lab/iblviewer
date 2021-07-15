@@ -19,9 +19,9 @@ def Cross3D(pos=(0,0,0), size=1.0, thickness=0.5, color='black', alpha=1, res=4,
     :param alpha: Alpha/opacity of the cross
     :param res: Resolution of the cylinders if not used in line_mode
     :param lines_mode: Whether lines are used or cylinders. The difference is in how they look like
-    when you zoom in on the cross. If you use lines, their thickness is constant on screen, whether
-    close or far. If you use cylinders, they will get thicker the closer you approach the camera
-    (in perspective mode of course)
+        when you zoom in on the cross. If you use lines, their thickness is constant on screen, whether
+        close or far. If you use cylinders, they will get thicker the closer you approach the camera
+        (in perspective mode of course)
     :return: vedo.Mesh
     """
     if lines_mode:
@@ -107,25 +107,25 @@ class Points(vedo.Points):
         :param positions: 3D positions
         :param radius: Radius of the points
         :param values: Custom scalar values. You may pass a list the same length 
-        as the number of points. If values is a 2D array, then we assume these are time series.
-        You will then need to call:
-        actor.polydata().GetPointData().SetActiveScalars(name)
-        actor.mapper().SelectColorArray(name)
-        where name is the array name that starts with the given scalars_prefix.
-        If you have three steps in your time series, you will have by default
-        Scalars_0, Scalars_1, Scalars_2.
+            as the number of points. If values is a 2D array, then we assume these are time series.
+            You will then need to call:
+            actor.polydata().GetPointData().SetActiveScalars(name)
+            actor.mapper().SelectColorArray(name)
+            where name is the array name that starts with the given scalars_prefix.
+            If you have three steps in your time series, you will have by default
+            Scalars_0, Scalars_1, Scalars_2.
         :param color_map: Color map, either a list of values and corresponding colors
-        or a color map name (see vedo documentation with color maps that follow matplotlib)
+            or a color map name (see vedo documentation with color maps that follow matplotlib)
         :param screen_space: Whether the points are rendered as screen-space points or as
-        spheres. The main difference is that screen-space is very fast and can display millions
-        of points whereas sphere mode allows you to zoom in on a point and you will see it
-        bigger up-close with a perspective camera.
+            spheres. The main difference is that screen-space is very fast and can display millions
+            of points whereas sphere mode allows you to zoom in on a point and you will see it
+            bigger up-close with a perspective camera.
         :param alpha: Alpha/opacity value
         :param res: Resolution of the point if screen-space is disabled
         :param min_v: Minimum value for the given values (will be computed if not given)
         :param max_v: Maximum value for the given values (will be computed if not given)
         :param scalars_prefix: Scalar array name prefix. The rest of the name is _id
-        where id starts at 0.
+            where id starts at 0.
         """
         self.scalars_prefix = 'Scalars_' if scalars_prefix is None else scalars_prefix
         self.axes = [1, 1, 1]
