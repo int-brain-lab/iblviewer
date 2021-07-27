@@ -47,8 +47,8 @@ class Collection(OrderedDict):
         """
         Set the next data as current one
         :param loop: Whether looping is enabled,
-        which means that if next value is out of range,
-        we start back at 0
+            which means that if next value is out of range,
+            we start back at 0
         """
         keys = self.get_keys()
         new_id = self.current_id + 1
@@ -61,8 +61,8 @@ class Collection(OrderedDict):
         """
         Set the previous data as current one
         :param loop: Whether looping is enabled,
-        which means that if previous value is out of range,
-        we go to -1 in a backward loop
+            which means that if previous value is out of range,
+            we go to -1 in a backward loop
         """
         keys = self.get_keys()
         new_id = self.current_id - 1
@@ -76,8 +76,8 @@ class Collection(OrderedDict):
         Store a data
         :param data: data instance
         :param data_id: data id, a unique string if possible.
-        If it's not a unique string, it will be appended a
-        number so that it's unique.
+            If it's not a unique string, it will be appended a
+            number so that it's unique.
         :param replace_existing: Whether any existing data with the same id is replaced or not
         :param set_current: Whether the newly stored data is set as the current one
         :return: The new data_id or None

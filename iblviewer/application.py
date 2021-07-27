@@ -469,11 +469,11 @@ class Viewer():
         Initialize the controller, main entry point to the viewer
         :param context: Context of the visualization
         :param embed_ui: Whether the UI is embed within the VTK window
-        :parma embed_font_size: Embed font size. Defaults to 16 points. You might need larger values
-        in case you have a small screen with high dpi (but VTK methods fail to detect that).
+        :param embed_font_size: Embed font size. Defaults to 16 points. You might need larger values
+            in case you have a small screen with high dpi (but VTK methods fail to detect that).
         :param jupyter: Whether we're running from a jupyter notebook or not
         :param plot: A vedo Plotter instance. You can either create it by yourself before hand, in case 
-        you want to have multiple windows with other stats or let the controller create a new one
+            you want to have multiple windows with other stats or let the controller create a new one
         :param plot_window_id: Sub-window id where the 3D visualization will be displayed
         :param num_windows: Number of subwindows, in case you want to display your own stuff later
         :param render: Whether rendering occurs at the end of the initialization or not. Defaults to False
@@ -864,7 +864,7 @@ class Viewer():
         Select an object, either by its name (or subname) or by
         reference to the vtk object. 
         :param target: Either the vtk actor or its name 
-        or its index (an int from selectable_objects.keys())
+            or its index (an int from selectable_objects.keys())
         """
         #objs = self.selectable_objects
         if isinstance(target, str):
@@ -996,15 +996,15 @@ class Viewer():
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
         :param color_map: A color map, it can be a color map built by IBLViewer or 
-        a color map name (see vedo documentation), or a list of values, etc.
+            a color map name (see vedo documentation), or a list of values, etc.
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param relative_end_points: Whether the given end point is relative to the start point. False by default,
-        except is spherical coordinates are given
+            except is spherical coordinates are given
         :param spherical_angles: 3D numpy array of spherical angle data of length n 
-        In case end_points is None, this replaces end_points by finding the relative
-        coordinate to each start point with the given radius/depth, theta and phi
+            In case end_points is None, this replaces end_points by finding the relative
+            coordinate to each start point with the given radius/depth, theta and phi
         :param radians: Whether the given spherical angle data is in radians or in degrees
         :return: Lines
         """
@@ -1036,7 +1036,7 @@ class Viewer():
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
         :param color_map: A color map, it can be a color map built by IBLViewer or 
-        a color map name (see vedo documentation), or a list of values, etc.
+            a color map name (see vedo documentation), or a list of values, etc.
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
@@ -1069,18 +1069,18 @@ class Viewer():
         Add new points as circles or spheres
         :param positions: 3D array of coordinates
         :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
-        in case as_spheres is False.
+            in case as_spheres is False.
         :param values: 1D array of values, one per neuron or a time series of such 1D arrays (numpy format)
         :param color_map: A color map, it can be a color map built by IBLViewer or 
-        a color map name (see vedo documentation), or a list of values, etc.
+            a color map name (see vedo documentation), or a list of values, etc.
         :param name: All point neurons are grouped into one object, you can give it a custom name
         :param screen_space: Type of point, if True then the points are static screen-space points.
-        If False, then the points are spheres. You see them larger when you zoom closer to them,
-        while this is not the case with screen-space points. Defaults to False.
+            If False, then the points are spheres. You see them larger when you zoom closer to them,
+            while this is not the case with screen-space points. Defaults to False.
         :param as_spheres: Whether the points are spheres, which means their size is relative to 
-        the 3D scene (they will get bigger if you move the camera closer to them). On the other hand,
-        if points are rendered as points, their radius in pixels will be constant, however close or
-        far you are from them (which can lead to unwanted visual results)
+            the 3D scene (they will get bigger if you move the camera closer to them). On the other hand,
+            if points are rendered as points, their radius in pixels will be constant, however close or
+            far you are from them (which can lead to unwanted visual results)
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :return: objects.Points
@@ -1126,15 +1126,15 @@ class Viewer():
         :param data: Volume image data or a file_path
         :param resolution: Resoluton of the volume
         :param file_path: File path of the volume. If you don't provide an image volume data,
-        then the file_path will be used to load the volume data
+            then the file_path will be used to load the volume data
         :param color_map: Color map for the volume
         :param alpha_map: Alpha map for the volume. If None, it will assume that 0 values
-        are transparent and maximum values are opaque
+            are transparent and maximum values are opaque
         :param select: Whether the volume is selected
         :param add_to_scene: Whether the volume is added to scene
         :param transpose: Transposition parameter. If None. nothing happens. If True, 
-        then the default IBL transposition is applied. You can provide your own, that is,
-        a list of 3 elements to reorder the volume as desired.
+            then the default IBL transposition is applied. You can provide your own, that is,
+            a list of 3 elements to reorder the volume as desired.
         :return: VolumeController
         """
         if isinstance(data, str) and file_path is None:
@@ -1671,10 +1671,10 @@ class Viewer():
         Set the UI visibility
         :param visible: Whether the UI is visible or not
         :param exceptions: Dictionary of objects that have to be the inverse of
-        the given state
+            the given state
         :param ui_button_visible: Whether the UI button is still visible or not,
-        so that the user can restore the UI by clicking on it. 
-        This is not necessary in case of Jupyter NB
+            so that the user can restore the UI by clicking on it.
+            This is not necessary in case of Jupyter NB
         """
         self.model.ui.visible = visible
 
@@ -2430,7 +2430,7 @@ class Viewer():
         :param widget: The slider widget (optional)
         :param event: The slider event (optional)
         :param value: The value to set. If None, then the slider value
-        is used, if it's given as widget param
+            is used, if it's given as widget param
         """
         if widget is not None and event is not None:
             value = int(widget.GetRepresentation().GetValue())
@@ -2453,7 +2453,7 @@ class Viewer():
         Set the time series for the current selected object
         :param value: The given time step
         :param force_update: Whether an update is forced even if the
-        given value is the same as the existing time step
+            given value is the same as the existing time step
         """
         if value is None:
             return
@@ -2508,7 +2508,7 @@ class Viewer():
         """
         Update the view with the given or current transfer function
         :param lut_model: A LUTModel (whose table property is a vtkLookupTable) 
-        to set on the current volume. If None, the current one will be used.
+            to set on the current volume. If None, the current one will be used.
         """
         view = self.model.selection_controller
         if view is None or not isinstance(view, VolumeController):
@@ -2530,7 +2530,7 @@ class Viewer():
         :param widget: The slider widget (optional)
         :param event: The slider event (optional)
         :param value: The value to set. If None, then the slider value
-        is used, if it's given as widget param
+            is used, if it's given as widget param
         """
         if widget is not None and event is not None:
             value = widget.GetRepresentation().GetValue()
@@ -2558,7 +2558,7 @@ class Viewer():
         :param widget: The slider widget (optional)
         :param event: The slider event (optional)
         :param value: The value to set. If None, then the slider value
-        is used, if it's given as widget param
+            is used, if it's given as widget param
         """
         if widget is not None and event is not None:
             value = widget.GetRepresentation().GetValue()

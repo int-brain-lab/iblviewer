@@ -229,7 +229,7 @@ def change_file_name(file_path, prefix=None, name=None, suffix=None):
     :param file_path: Input file path
     :param prefix: Prefix to the file name
     :param name: Whether a new name is set instead of the current name.
-    If None, the current file name is used.
+        If None, the current file name is used.
     :param suffix: Suffix to the file name
     :return: New file path
     """
@@ -257,7 +257,7 @@ def time_diff(t):
     """
     Get a time difference in seconds
     :param t: Time
-    return: Number of seconds
+    :return: Number of seconds
     """
     now  = datetime.now()
     duration = now - t
@@ -396,8 +396,8 @@ def box_widget(plot, target, interaction_callback=None, place_factor=1,
     :param plot: vtk plot
     :param target: Target object
     :param interaction_callback: Function that will be called every
-    time there is an interaction with the widget. That's where
-    you set the clipping planes to the object for instance
+        time there is an interaction with the widget. That's where
+        you set the clipping planes to the object for instance
     :param place_factor: see vtkBoxWidget.setPlaceFactor()
     :param handle_size: set the relative handle size, see vtkBoxWidget.SetHandleSize()
     :param outline_color: Color of the outline

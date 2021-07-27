@@ -138,8 +138,8 @@ class VolumeModel:
         Load a volume data file. Supports NRRD and many other formats thanks to vedo/VTK
         :param file_path: Volume file path. Could support other file types easily.
         :param remap_scalars: Whether scalar values in the volume are replaced by 
-        their row id from a mapping that stores. This is necessary in the case of segmented
-        volumes with regions that have a discontinuous id.
+            their row id from a mapping that stores. This is necessary in the case of segmented
+            volumes with regions that have a discontinuous id.
         :param mapping: Pandas Series or a Dictionary
         :param make_current: Set the volume data as the current one
         :return: 3D array
@@ -184,7 +184,7 @@ class VolumeModel:
         Reassign volume values (slow on large volumes!) so that they're continuous
         :param data: Volume ndarray
         :param write_path: Where the modified volume will be stored 
-        (to spare going through this method next time)
+            (to spare going through this method next time)
         :param mapping: Pandas Series or a Dictionary that maps raw volume scalars to new ones
         :return: Modified volume data
         """
@@ -217,11 +217,11 @@ class VolumeModel:
         """
         Build a look-up table (LUT, sometimes known as transfer function) for the volume
         :param scalar_map: A 2D list with values in first column from the volume itself and values from
-        the second column being your scalar values that correspond to such region
+            the second column being your scalar values that correspond to such region
         :param scalar_range: Min and max values in a list
         :param color_map: Color map name to apply
         :param alpha_map: Alpha map, either None or a list of values the same length as scalar_map, that
-        says how transparent a scalar value should be
+            says how transparent a scalar value should be
         :param zero_is_transparent: Whether zero values are made transparent, True by default
         :param noise_amount: Whether a noise value is applied on the colors
         :param nan_rgba: Color and transparency (RGBA) to assign to invalid (out of range or None) scalar values
@@ -455,11 +455,11 @@ class LUTModel:
         each voxel in 3D. Instead we define colors that represent these values and assign them to 
         segmented regions in a 1D list.
         :param scalar_map: A 2D list with values in first column from the volume itself and values from
-        the second column being your scalar values that correspond to such region
+            the second column being your scalar values that correspond to such region
         :param scalar_range: Min and max values in a list
         :param color_map: Color map name to apply
         :param alpha_map: Alpha map, either None or a list of values the same length as scalar_map, that
-        says how transparent a scalar value should be
+            says how transparent a scalar value should be
         :param zero_is_transparent: Whether zero values are made transparent, True by default
         :param noise_amount: Whether a noise value is applied on the colors
         :param nan_rgba: Color and alpha values to assign to invalid (out of range or None) scalar values
@@ -594,7 +594,7 @@ class VolumeController():
         :param slicer_box: Whether the slicer box is enabled at init
         :param center_on_edges: Whether the volume is offest by half a voxel or not
         :param alpha_unit_upper_offset: The offset to apply to alpha unit computation.
-        If greater than 0, the volume will be less opaque
+            If greater than 0, the volume will be less opaque
         :param add_to_scene: Whether the volume is added to scene after init
         """
         self.plot = plot
@@ -641,7 +641,7 @@ class VolumeController():
         :param clipping: Whether clipping is enabled
         :param slicer_box: Whether the slicer box mode is enabled (6 clipping planes)
         :param center_on_edges: Whether the volume's center is aligned to its edges 
-        rather than the voxel center
+            rather than the voxel center
         :param add_to_scene: Whether the object is added to the scene
         """
         self.build_actor(center_on_edges, add_to_scene)
@@ -804,7 +804,7 @@ class VolumeController():
         """
         Mirror the volume on given axes
         :param mirror_axes: A list of axes (either 0, 1, 2 or 'x', 'y', 'z') on which
-        the volume will be mirrored. Optional
+            the volume will be mirrored. Optional
         """
         if axes is None or self.actor is None:
             return
@@ -819,8 +819,8 @@ class VolumeController():
         """
         Initialize the volume picker
         :param opacity_iso_value: Threshold that defines at what accumulated
-        opacity the picker hits the volume. In the case of a segmented volume,
-        you want to keep this value very low as the default one.
+            opacity the picker hits the volume. In the case of a segmented volume,
+            you want to keep this value very low as the default one.
         """
         # As per C++ doc https://vtk.org/Wiki/VTK/Examples/Cxx/VTKConcepts/Scalars
         # https://stackoverflow.com/questions/35378796/vtk-value-at-x-y-z-point 
@@ -991,7 +991,7 @@ class VolumeController():
         """
         Set the color and alpha map to the view objects
         :param color_map: Nested list of scalar values and rgb colors
-        like [[0, [0.0, 0.0, 0.0]], [8, [0.5, 0.8, 0.3]], ...]
+            like [[0, [0.0, 0.0, 0.0]], [8, [0.5, 0.8, 0.3]], ...]
         :param alpha_map: 2D list of scalar values and alpha values
         """
         lut = self.model.luts.current
@@ -1075,7 +1075,7 @@ class VolumeController():
         So you need to go further into the "cloud" so to speak, in order to find the values you want.
         :param position: 3D array
         :param normal_step: A vector normal multiplied by the lookup distance, in case the raw position yields
-        bad or unwanted results
+            bad or unwanted results
         :param avoid_values: Try and find other values than this
         :param cast_to_int: Whether the value should be cast to integer
         :return: Scalar value
@@ -1542,7 +1542,7 @@ class SlicerView():
         """
         Set a color map to the slice
         :param color_map: Color map, can be a string, a list of colors or more. 
-        See vedo documentation.
+            See vedo documentation.
         """
         self.color_map = color_map
         if alpha_map is not None:
@@ -1692,9 +1692,9 @@ class SlicerView():
         :param normal: Axis normal, can be either +1.0 or -1.0 along that axis
         :param axis: Axis integer, 0 for X, 1 for Y, 2 for Z
         :param use_reslice: if True, this enables vtkImageReslice which is useful when
-        the normal is not aligned to either X, Y or Z. If you use it on an axis-aligned
-        normal, some color inaccuracies will appear if you don't tweak the vtkImageResliceMapper.
-        This is why the default is False.
+            the normal is not aligned to either X, Y or Z. If you use it on an axis-aligned
+            normal, some color inaccuracies will appear if you don't tweak the vtkImageResliceMapper.
+            This is why the default is False.
         :return: Mesh actor
         """
         resolution = self.volume_view.model.resolution
