@@ -121,8 +121,7 @@ class DataViewer():
         statistics.axes.set_xlabel('Brain regions')
 
 
-if __name__ == '__main__':
-
+def main():
     # More parsing options are added in parse_args() method below.
     # -> Please check that you don't override any existing argument name!
     parser = argparse.ArgumentParser(description='International Brain Viewer based on VTK')
@@ -142,3 +141,7 @@ if __name__ == '__main__':
 
     # Finally, launch the UI and 3D viewer
     iblviewer.launch(data.on_viewer_initialized, data.on_statistics_update, args)
+
+
+if __name__ == '__main__':
+    main()

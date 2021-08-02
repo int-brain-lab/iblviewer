@@ -95,9 +95,14 @@ def on_viewer_initialized(viewer):
         point_actors.append(points)
     viewer.plot.add(point_actors)
 
-if __name__ == '__main__':
+
+def main():
     iblviewer = IBLViewer()
     # First retrieve command-line arguments (default ones + custom ones above)
     args = iblviewer.parse_args()
     # Now start the viewer and add points when it's initialized
     iblviewer.launch(on_viewer_initialized, None, args)
+
+
+if __name__ == '__main__':
+    main()

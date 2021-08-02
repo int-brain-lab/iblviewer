@@ -96,7 +96,7 @@ class ProbeData:
         return lines
 
 
-if __name__ == '__main__':
+def main():
     iblviewer = IBLViewer()
     # First retrieve command-line arguments (default ones + custom ones above)
     args = iblviewer.parse_args()
@@ -112,3 +112,7 @@ if __name__ == '__main__':
     add_insertion_probes(viewer, one_connection, as_segments=False, line_width=5)
     viewer.show()
     '''
+
+
+if __name__ == '__main__':
+    main()

@@ -234,11 +234,7 @@ def get_point_neurons_data(one=None, ba=None, insertions=None, start=0, end=None
     return insertion_ids, xyz_positions, xyz_resolved_mask, data_mask
 
 
-#def get_points_inside_brain(viewer, positions):
-
-
-if __name__ == '__main__':
-
+def main():
     # Test probe ids. The first one has MLAPDV data, the others have their channels computed instead.
     probe_ids = ['00a824c0-e060-495f-9ebc-79c82fef4c67',
                 '0143d3fe-79c2-4922-8332-62c3e4e0ba85',
@@ -303,3 +299,7 @@ if __name__ == '__main__':
     # Finally, before showing everything, we select the latest added object (the points)
     viewer.select(-1)
     viewer.show()
+
+
+if __name__ == '__main__':
+    main()

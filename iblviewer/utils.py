@@ -13,8 +13,8 @@ import math
 
 ROOT_FOLDER = Path(__file__).parent.parent
 ASSETS_FOLDER = ROOT_FOLDER.joinpath('./assets')
-EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./examples')
-EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./examples/data')
+EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_examples')
+EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_examples/data')
 
 
 def get_type(element):

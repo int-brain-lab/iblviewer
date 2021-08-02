@@ -1,11 +1,11 @@
 # IBL Viewer
 The International Brain Laboratory Viewer is a simple and fast 3D interactive visualization tool based on VTK that uses GPU accelerated volume and surface rendering. It runs on python 3.8+ and it can be embed in Jupyter Lab/Notebook and Qt user interfaces.
 
+This viewer is featured with an optional QT user interface with more advanced functionalities like dynamic statistics. In the terminal, type `iblviewer` and see what parameters are available. The viewer launches by default with a Qt UI.
+
 Most of the viewer makes VTK usable as an interactive application and you may use it as such. Just use `from iblviewer.application import Viewer`
 
 The small added part related to IBL allows scientists to view their data and models for further analysis. From electrophysiological data to neuronal connectivity, this tool allows simple and effective 3D visualization for many use-cases like multi-slicing and time series even on volumes. In that case, you will use `from iblviewer.mouse_brain import MouseBrainViewer`
-
-This viewer is also featured with an optional QT user interface with more advanced functionalities like dynamic statistics. In the terminal, type `iblviewer` and see what parameters are available. The viewer launches by default with a Qt UI.
 
 ## Installation
 ```bash
@@ -43,7 +43,21 @@ pip install git+https://github.com/int-brain-lab/iblviewer.git
 ```
 
 ## Examples
-Sample code to run the viewer:
+Write `iblviewer` in the command line to start the viewer, add `--help` for info about arguments.
+You may launch examples/demos from the command line too, write `iblviewer`, hit `TAB` key twice and a list of names are given, like `iblviewer-volume-mapping-demo`. There's a demo for headless rendering when you only need to execute code and produce an image or video.
+
+If you wish to run your own code, here are steps below.
+
+Code to run the launcher with arguments from the command line (such as using the Qt UI)
+```
+from iblviewer.launcher import IBLViewer
+viewer = IBLViewer()
+viewer.launch()
+```
+
+If you're not interested in the Qt UI, you may either directly use the VTK viewer below or the neuroscience one.
+
+Sample code to run the generic VTK viewer:
 ```python
 from iblviewer.application import Viewer
 viewer = Viewer()
@@ -67,11 +81,11 @@ viewer.initialize(resolution=50, mapping='Allen', add_atlas=True,
 viewer.show()
 ```
 
-[Volumetric time series](examples/ibl_volume_mapping.py) of values assigned to brain regions.
+[Volumetric time series](iblviewer_examples/ibl_volume_mapping.py) of values assigned to brain regions.
 
-[Point neurons](examples/ibl_point_neurons.py) and connectivity data.
+[Point neurons](iblviewer_examples/ibl_point_neurons.py) and connectivity data.
 
-[Insertion probes](examples/ibl_insertion_probes.py), or how to display lines made of an heterogeneous amount of points. This example requires valid credentials to IBL back-end.
+[Insertion probes](iblviewer_examples/ibl_insertion_probes.py), or how to display lines made of an heterogeneous amount of points. This example requires valid credentials to IBL back-end.
 
 Since this tool is built on top of VTK and [vedo](https://github.com/marcomusy/vedo), a wrapper for VTK that makes it easy to use, you have endless possibilities for plotting and visualizing your data.
 

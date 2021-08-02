@@ -9,7 +9,7 @@ setup(
     author='Nicolas Antille',
     author_email='nicolas.antille@gmail.com',
     license='MIT',
-    packages=find_packages(include=['iblviewer','iblviewer.*', 'examples', 'examples.*']),
+    packages=find_packages(include=['iblviewer','iblviewer.*', 'iblviewer_examples', 'iblviewer_examples.*']),
     install_requires=['numpy',
                       'matplotlib',
                       'pandas',
@@ -26,6 +26,13 @@ setup(
     entry_points={
         "console_scripts": [
             "iblviewer = iblviewer.launcher:main",
+            "iblviewer-points-demo = iblviewer_examples.ibl_point_neurons:main",
+            "iblviewer-probes-demo = iblviewer_examples.ibl_insertion_probes:main",
+            "iblviewer-coverage-demo = iblviewer_examples.ibl_brain_coverage:main",
+            "iblviewer-volume-mapping-demo = iblviewer_examples.ibl_volume_mapping:main",
+            "iblviewer-brain-wide-map = iblviewer_examples.ibl_brain_wide_map:main",
+            "iblviewer-human-brain-demo = iblviewer_examples.human_brain:main",
+            "iblviewer-headless-render-demo = iblviewer_examples.headless_render:main"
         ]
     },
     classifiers=[

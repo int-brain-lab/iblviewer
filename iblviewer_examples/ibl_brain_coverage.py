@@ -60,30 +60,35 @@ def plot_agg(ccov, axis, ax=None, ba=None, **kwargs):
     return hm
 '''
 
-viewer = MouseBrainViewer()
-resolution = 50
-#viewer.initialize(resolution=resolution, mapping='Allen-lr', embed_ui=True, dark_mode=False, add_atlas=False, add_dwi=True, dwi_color_map='viridis')
-viewer.initialize(resolution=resolution, mapping='Allen-lr', embed_ui=True, dark_mode=False)
 
-ba = viewer.ibl_model.atlas
-file_path = utils.EXAMPLES_DATA_FOLDER.joinpath(f'./ncov_{resolution}.npz')
-if os.path.exists(str(file_path)):
-    ncov = np.load(str(file_path))['arr_0']
-else:
-    cvol = compute_coverage_volume(ba)
-    ncov = cvol.copy()
-    ncov[ncov < 0] = -1
-    ncov += 1
-    print('Done computing volume with range', np.min(ncov), np.max(ncov))
-    np.savez_compressed(str(file_path), ncov)
+def main():
+    viewer = MouseBrainViewer()
+    resolution = 50
+    #viewer.initialize(resolution=resolution, mapping='Allen-lr', embed_ui=True, dark_mode=False, add_atlas=False, add_dwi=True, dwi_color_map='viridis')
+    viewer.initialize(resolution=resolution, mapping='Allen-lr', embed_ui=True, dark_mode=False)
 
-cov_vol = viewer.add_volume(ncov, resolution, color_map='viridis', transpose=True, select=True) #, alpha_map=[0, 0.5, 1]
-cov_vol.set_opacity(1.0)
-viewer.show().close()
-'''
-ncov[ncov == -1] = np.nan
+    ba = viewer.ibl_model.atlas
+    file_path = utils.EXAMPLES_DATA_FOLDER.joinpath(f'./ncov_{resolution}.npz')
+    if os.path.exists(str(file_path)):
+        ncov = np.load(str(file_path))['arr_0']
+    else:
+        cvol = compute_coverage_volume(ba)
+        ncov = cvol.copy()
+        ncov[ncov < 0] = -1
+        ncov += 1
+        print('Done computing volume with range', np.min(ncov), np.max(ncov))
+        np.savez_compressed(str(file_path), ncov)
 
-plt.figure(), plot_agg(ncov, 2, ax=ba.plot_hslice(-.002), ba=ba, alpha=0.5)
-plt.figure(), plot_agg(ncov, 1, ax=ba.plot_sslice(0), ba=ba, alpha=0.5)
-plt.figure(), plot_agg(ncov, 0, ax=ba.plot_cslice(0), ba=ba, alpha=0.5)
-'''
+    cov_vol = viewer.add_volume(ncov, resolution, color_map='viridis', transpose=True, select=True) #, alpha_map=[0, 0.5, 1]
+    cov_vol.set_opacity(1.0)
+    viewer.show().close()
+    '''
+    ncov[ncov == -1] = np.nan
+
+    plt.figure(), plot_agg(ncov, 2, ax=ba.plot_hslice(-.002), ba=ba, alpha=0.5)
+    plt.figure(), plot_agg(ncov, 1, ax=ba.plot_sslice(0), ba=ba, alpha=0.5)
+    plt.figure(), plot_agg(ncov, 0, ax=ba.plot_cslice(0), ba=ba, alpha=0.5)
+    '''
+
+if __name__ == '__main__':
+    main()

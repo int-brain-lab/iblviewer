@@ -28,7 +28,8 @@ class HumanBrainData():
         viewer.add_volume(self.volume, self.resolution, None, self.color_map, select=True)
         viewer.show()
 
-if __name__ == '__main__':
+
+def main():
     parser = argparse.ArgumentParser(description='Human Brain Atlas')
     parser.add_argument('-l', dest='lod', type=int, default=3, 
     help='LOD value')
@@ -45,3 +46,7 @@ if __name__ == '__main__':
     hb.load_volume(args.volume, args.lod)
 
     iblviewer.launch(hb.on_viewer_initialized)
+
+
+if __name__ == '__main__':
+    main()
