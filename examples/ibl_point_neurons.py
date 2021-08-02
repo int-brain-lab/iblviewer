@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pickle
 
-from iblviewer.mouse_brain import MouseBrainViewer
+from iblviewer.launcher import IBLViewer
 from iblviewer import utils
 
 '''
@@ -56,12 +56,11 @@ def process_point_neurons(data):
     min_v = np.min(timings)
     max_v = np.max(timings)
     return positions, timings, min_v, max_v
-
-
-if __name__ == '__main__':
-    viewer = MouseBrainViewer()
-    viewer.initialize(resolution=50, mapping='Allen', add_atlas=True, add_dwi=False, 
-                    dwi_color_map='Greys_r', embed_ui=True)
+    
+def on_viewer_initialized(viewer):
+    
+    #viewer = MouseBrainViewer()
+    #viewer.initialize(resolution=50, mapping='Allen', add_atlas=True, add_dwi=False, dwi_color_map='Greys_r', embed_ui=True)
 
     # Now add point neurons
     data = ['./exp2_db4df448-e449-4a6f-a0e7-288711e7a75a_both', 
@@ -96,4 +95,9 @@ if __name__ == '__main__':
         point_actors.append(points)
     viewer.plot.add(point_actors)
 
-    viewer.show().close()
+if __name__ == '__main__':
+    iblviewer = IBLViewer()
+    # First retrieve command-line arguments (default ones + custom ones above)
+    args = iblviewer.parse_args()
+    # Now start the viewer and add points when it's initialized
+    iblviewer.launch(on_viewer_initialized, None, args)

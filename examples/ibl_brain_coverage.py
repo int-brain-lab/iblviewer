@@ -77,8 +77,8 @@ else:
     print('Done computing volume with range', np.min(ncov), np.max(ncov))
     np.savez_compressed(str(file_path), ncov)
 
-volume_controller = viewer.add_volume(ncov, resolution, color_map='viridis', transpose=True, select=True) #, alpha_map=[0, 0.5, 1]
-volume_controller.set_opacity(1.0)
+cov_vol = viewer.add_volume(ncov, resolution, color_map='viridis', transpose=True, select=True) #, alpha_map=[0, 0.5, 1]
+cov_vol.set_opacity(1.0)
 viewer.show().close()
 '''
 ncov[ncov == -1] = np.nan

@@ -358,7 +358,7 @@ class Volume(vedo.Volume):
             img = inputobj
 
         elif isinstance(inputobj, vedo.Volume):
-            img = inputobj.inputdata()
+            img = inputobj.GetMapper().GetInput()
 
         elif "UniformGrid" in inputtype:
             img = inputobj
@@ -708,6 +708,13 @@ class VolumeController():
             if slicer.actor is not None:
                 slicer.actor.alpha(value)
 
+    def get_opacity(self):
+        """
+        Get the relative opacity unit
+        :return: Float
+        """
+        return self.get_relative_opacity_unit()
+
     def get_relative_opacity_unit(self):
         """
         Get the alpha unit relative value
@@ -770,7 +777,7 @@ class VolumeController():
         self.actor.name = self.model.name
         self.actor.shade(False)
         self.actor.mode(0)
-        self.actor.pickable(1)
+        self.actor.pickable(True)
         self.set_interactive_subsampling(False)
 
         if center_on_edges:
@@ -842,7 +849,8 @@ class VolumeController():
             slicer_model = SlicerModel(axis=axis_id)
             slicer_model.align_to_axis(axis_id, self.model.dimensions)
             self.model.slicers.store(slicer_model)
-            self.slicers[axis_id] = SlicerView(self.plot, self, slicer_model)
+            # It's important in this case to have standalone=False
+            self.slicers[axis_id] = SlicerView(self.plot, self, slicer_model, standalone=False)
         
     def update_slicer(self, slicer_id, value=None, normal=None):
         """
@@ -929,7 +937,9 @@ class VolumeController():
 
     def set_volume_clipping(self, on=None):
         """
-        Set volume clipping on or off
+        Set volume clipping on or off.
+        :param on: Whether clipping is enabled or disabled. If None, then
+        the state is toggled.
         """
         if on is None:
             self.enable_volume_clipping = not self.enable_volume_clipping
@@ -938,9 +948,20 @@ class VolumeController():
         if self.enable_volume_clipping:
             self.actor.mapper().SetClippingPlanes(self.clipping_planes)
         else:
-            self.actor.mapper().SetClippingPlanes(None)    
+            self.actor.mapper().SetClippingPlanes(None)
 
-    def box_cutter_update(self, widget=None, event=None):
+    def clip_to_bounds(self, bounds):
+        """
+        Clip the volume and move the slicing planes according to 6 boundary points
+        :param bounds: Six values in a list (xmin, xmax, ymin, ymax, zmin, zmax)
+        """
+        planes = vtk.vtkPlanes()
+        planes.SetBounds(bounds)
+        # Normals are reversed with the above code
+        # so we fix that here with flip_normals=True
+        self.set_clipping_planes(planes, flip_normals=True)
+
+    def box_widget_update(self, widget=None, event=None):
         """
         Clip the volume with the current box widget
         :param widget: vtkBoxCutter
@@ -948,11 +969,17 @@ class VolumeController():
         """
         if widget is None:
             return
-        clipping_planes = vtk.vtkPlanes()
-        widget.GetPlanes(clipping_planes)
+        planes = vtk.vtkPlanes()
+        widget.GetPlanes(planes)
+        self.set_clipping_planes(planes)
 
-        vtk_n = clipping_planes.GetNormals()
-        vtk_pts = clipping_planes.GetPoints()
+    def set_clipping_planes(self, planes, flip_normals=False):
+        """
+        Clip the volume and move the slicing planes according the given planes
+        :param planes: vtkPlanes
+        """
+        vtk_n = planes.GetNormals()
+        vtk_pts = planes.GetPoints()
         num_pts = vtk_pts.GetNumberOfPoints()
         for plane_id in range(num_pts):
             normal = vtk_n.GetTuple(plane_id)
@@ -964,6 +991,8 @@ class VolumeController():
             if np.linalg.norm(current_origin - origin) < 0.1:
                 continue
             plane.SetOrigin(origin)
+            if flip_normals:
+                normal = np.array(normal)*-1
             plane.SetNormal(normal)
             self.update_slicer(plane_id, origin, normal)
 
@@ -1050,7 +1079,8 @@ class VolumeController():
 
     def toggle_hollow(self):
         """
-        Toggle hollow mode for volume rendering. This is intended to work only on segmented (annotated) volumes.
+        Toggle hollow mode for volume rendering. This is intended 
+        to work only on segmented (annotated) volumes.
         """
         volume_property = self.actor.GetProperty()
         # Shout at VTK devs: it's twisted to name properties Disable and then have DisableOff...
@@ -1100,6 +1130,12 @@ class VolumeController():
         if value is None and none_as_zero:
             value = 0
         return value
+
+    def raycast(self, origin, screen_position):
+        """
+        Shorthand for pick() method
+        """
+        return self.pick(origin, screen_position)
 
     def pick(self, origin, screen_position):
         """
@@ -1217,71 +1253,35 @@ class VolumeController():
         else:
             self.actor._mapper.InteractiveAdjustSampleDistancesOff()
 
-    def remesh_surface(self, mesh):
-        """
-        This remesher cleans and smoothes a given mesh.
-        This is useful in the case of extracting surface meshes
-        from volumes, which most of the times yield jagged meshes.
-        """
-        raise NotImplementedError
-
-        import trimesh
-        mesh = vedo.vedo2trimesh(actor)
-        trimesh.smoothing.filter_laplacian(mesh)
-        actor = vedo.trimesh2vedo(mesh)
-        
-        pdnorm = vtk.vtkPolyDataNormals()
-        pdnorm.SetInputData(actor._polydata)
-        pdnorm.SetComputePointNormals(True)
-        pdnorm.SetComputeCellNormals(True)
-        pdnorm.SetConsistency(True)
-        pdnorm.FlipNormalsOff()
-        pdnorm.SetSplitting(True)
-        pdnorm.SetFeatureAngle(89)
-        # print(pdnorm.GetNonManifoldTraversal())
-        pdnorm.Update()
-        actor._polydata = pdnorm.GetOutput()
-        actor._mapper.SetInputData(actor._polydata)
-        actor._mapper.Modified()
-
-        actor._mapper.SetScalarRange(min_value, tf.scalar_max)
-        actor._mapper.SetScalarModeToUsePointData()
-        actor._mapper.ScalarVisibilityOn()
-        actor._mapper.SetLookupTable(tf.opaque_lut)
-
-        scalars = np.array([label]*actor._polydata.GetNumberOfPoints())
-        scalars = np.ascontiguousarray(scalars)
-        vtk_scalars = vtk.util.numpy_support.numpy_to_vtk(scalars, deep=True)
-        vtk_scalars.SetName('scalars')
-        actor._polydata.GetPointData().SetScalars(vtk_scalars)
-        actor._polydata.GetPointData().SetActiveScalars('scalars')
-        actor._polydata.GetPointData().Modified()
-        return actor
-        #actor.decimate(0.1).smoothMLS2D().clean()
-        #actor.alpha(0.8)
-        #test = self.view.volume.actor.legosurface(vmin=regions, vmax=regions)
-        #test.alpha(0.8)
-        #actor = thresholded_volume.isosurface(1)
-
-    def isosurface(self, label, max_label=None, exceptions=[0], force_rebuild=False, set_current=True, to_int=True):
+    def isosurface(self, label, exceptions=[0], force_rebuild=False, set_current=True, to_int=True, split_meshes=True):
         """
         Creates a surface mesh (isosurface) of a segmented/labelled volume for the given value.
-        Unlike general isosurfacing, this method thresholds the volume to the desired
-        label and then extracts the surface mesh of the desired region/label/segmentation.
+        Unlike general isosurfacing, this method extracts only the surface mesh of the 
+        desired region/label/segmentation, not of all values from 0 to label.
         :param label: Label (scalar) value found in the volume
         :param exceptions: If the label is found in the exceptions list, isosurfacing will not occur
         :param force_rebuild: Whether rebuilding is forced in case we find an existing mesh for the given label
-        :return: Mesh actor
+        :param set_current: Whether the label is set as the current one in the model
+        :param to_int: Whether the label is cast to integer
+        :param split_meshes: Whether we split meshes when multiple ones are found
+        :return: A list of all manifold meshes for the given label
         """
         if label is None or label in exceptions:
             return
         if to_int:
             label = int(label)
-        existing_mesh = self.model.isosurfaces.get(label)
-        if existing_mesh is not None and not force_rebuild:
-            return existing_mesh
+        existing_meshes = self.model.isosurfaces.get(label)
+        if existing_meshes is not None and not force_rebuild:
+            return existing_meshes
 
         lut = self.model.luts.current
+        simple_lut = vtk.vtkLookupTable()
+        simple_lut.SetNumberOfColors(1)
+        simple_lut.SetTableRange(0, 1)
+        simple_lut.SetScaleToLinear()
+        simple_lut.SetTableValue(0, 0, 0, 0, 0)
+        simple_lut.SetTableValue(1, *lut.mapped_lut.GetTableValue(label))
+        simple_lut.Build()
 
         # Generate object boundaries from labelled volume 
         discrete = vtk.vtkDiscreteMarchingCubes()
@@ -1302,36 +1302,60 @@ class VolumeController():
         smoother.NonManifoldSmoothingOn()
         smoother.NormalizeCoordinatesOn()
         smoother.Update()
+        
+        self.model.isosurfaces[label] = []
+        #splitter = vtk.vtkExtractPolyDataGeometry()
+        if split_meshes:
+            splitter = vtk.vtkPolyDataConnectivityFilter()
+            splitter.SetInputConnection(smoother.GetOutputPort())
+            splitter.SetExtractionModeToAllRegions()
+            splitter.ColorRegionsOn()
+            splitter.Update()
+
+            for region_id in range(splitter.GetNumberOfExtractedRegions()):
+                #splitter.AddSpecifiedRegion(region_id)
+                #splitter.Update()
+                
+                #poly = vtk.vtkPolyData()
+                #poly.ShallowCopy(splitter.GetOutput())
+
+                threshold = vtk.vtkThreshold()
+                threshold.SetInputConnection(splitter.GetOutputPort())
+                threshold.ThresholdBetween(region_id, region_id)
+                threshold.Update()
+                actor = vedo.Mesh(threshold.GetOutput())
+                #actor._mapper.SetScalarRange(min_value, lut.scalar_max)
+                #actor._mapper.SetUseLookupTableScalarRange(True)
+                actor._mapper.SetLookupTable(simple_lut)
+                actor._mapper.ScalarVisibilityOn()
+                actor.name = 'Isosurface_' + str(label)
+                self.model.isosurfaces[label].append(actor)
+                #actor.cmap(lut.scalar_lut, np.ones(poly.GetNumberOfVerts())*label)
+        else:
+            poly = smoother.GetOutput()
+            actor = vedo.Mesh(poly)
+            actor._mapper.SetLookupTable(simple_lut)
+            actor._mapper.ScalarVisibilityOn()
+            actor.name = 'Isosurface_' + str(label)
+            self.model.isosurfaces[label].append(actor)
 
         '''
+        pdnorm = vtk.vtkPolyDataNormals()
+        pdnorm.SetInputData(smoother.GetOutput())
+        pdnorm.ComputePointNormalsOn()
+        pdnorm.ComputeCellNormalsOn()
+        pdnorm.FlipNormalsOff()
+        pdnorm.ConsistencyOn()
+        pdnorm.Update()
+        
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInputConnection(smoother.GetOutputPort())
         mapper.SetLookupTable(lut.scalar_lut)
         mapper.SetScalarRange(min_value, lut.scalar_max)
         '''
-        #min_value = lut.scalar_min
-        
-        simple_lut = vtk.vtkLookupTable()
-        simple_lut.SetNumberOfColors(1)
-        simple_lut.SetTableRange(0, 1)
-        simple_lut.SetScaleToLinear()
-        simple_lut.SetTableValue(0, 0, 0, 0, 0)
-        simple_lut.SetTableValue(1, *lut.mapped_lut.GetTableValue(label))
-        simple_lut.Build()
-
-        poly = smoother.GetOutput()
-        actor = vedo.Mesh(poly)
-        #actor._mapper.SetScalarRange(min_value, lut.scalar_max)
-        #actor._mapper.SetUseLookupTableScalarRange(True)
-        actor._mapper.SetLookupTable(simple_lut)
-        actor._mapper.ScalarVisibilityOn()
-        actor.name = 'Isosurface_' + str(label)
-        #actor.cmap(lut.scalar_lut, np.ones(poly.GetNumberOfVerts())*label)
-
-        self.model.isosurfaces[label] = actor
         if set_current:
             self.model.isosurfaces.set_current(label)
-        return actor
+        return self.model.isosurfaces[label]
 
 
 @dataclass
@@ -1454,18 +1478,18 @@ class SlicerView():
 
     slices = {}
 
-    def __init__(self, plot, volume_view, slicer_model, standalone=False):
+    def __init__(self, plot, volume_view, slicer_model, standalone=True):
         """
         Constructor
         :param plot: Plot instance
         :param volume_view: VolumeView instance
         :param slicer_model: SlicerModel instance
+        :param standalone: Whether the slice is a standalone actor that
+        can be clicked. Set this to False if you want to use transparency,
+        at the expense that because of a VTK bug, you won't be able to
+        click on it anymore, requiring you to code another way of detecting
+        where the user clicked. See more in initialize_mapper()
         """
-        '''
-        if SlicerView.slices.get(volume_view) is None:
-            SlicerView.slices[volume_view] = []
-        SlicerView.slices[volume_view].append(self)
-        '''
         self.plot = plot
         self.volume_view = volume_view
         self.model = slicer_model
@@ -1475,6 +1499,7 @@ class SlicerView():
         self.actor = None
         self.reslice = None
         self.slice_type = -1
+        self.depth_peeling_enabled = None
         self.standalone = standalone
         self.got_slice = False
         self.color_map = None
@@ -1497,26 +1522,6 @@ class SlicerView():
 
         self.initialize_mapper()
 
-        if self.standalone:
-            # As per a bug in VTK 9 that I found while using vedo that makes pickable fail when
-            # there is transparency as per https://github.com/marcomusy/vedo/issues/291
-            # Force opaque fix should be gone with the next update of VTK (hopefully...)
-            # In the meantime, this option yields unwanted light artifacts
-            pass #self.actor.ForceOpaqueOn()
-        # We bypass the bug when a VolumeView has multiple slicers like in box mode
-        # because the click detection occurs on the volume and we perform an additional
-        # test to see if a slicer yields a nearby result. If it does, the result is like
-        # clicking on the slice and we get transparency for free.
-        self.actor.pickable(self.standalone)
-
-        """ 
-        slice_center = self.actor.centerOfMass()
-        interactor_plane = Plane(pos=slice_center, normal=normal, sx=10000).alpha(0.2)
-        interactor_plane.c('white')
-        interactor_plane.ForceOpaqueOn()
-        interactor_plane.pickable(True) 
-        """
-
     def initialize_mapper(self):
         """
         Initialize the object mapper
@@ -1525,16 +1530,39 @@ class SlicerView():
         mapper.SetScalarModeToUsePointData() #SetScalarModeToUsePointFieldData
         mapper.SetColorModeToMapScalars()
         mapper.ScalarVisibilityOn()
+        # We operate on static volumes thanks to the double LUT mapping implemented here
         mapper.SetStatic(True)
 
         # Without using scalar range, the mapping will be off
         mapper.SetUseLookupTableScalarRange(True)
         
-        # This very line below will mess up the entire slice coloring if:
-        # - you have a segmented volume and this is set to True
-        # - you have a non-segmented (like raw MRI, CT) volume and this is set to False
+        # We prevent this actor from being pickable as a result of the bug described below
+        # when we want to use transparency on the slice.
+        self.actor.pickable(self.standalone)
+        if self.standalone:
+            # There is a bug in VTK 9 that prevents clicking on transparent objects
+            # as reported on vedo's tracker https://github.com/marcomusy/vedo/issues/291
+            # The "Force opaque fix" below should be gone with the next VTK update hopefully.
+            # In the meantime, we use this.
+            # TODO: remove this when this bug is fixed in VTK
+            self.actor.ForceOpaqueOn()
+        else:
+            # We bypass the transparent selection bug when a VolumeView has multiple slicers 
+            # like in box mode because the click detection occurs on the volume and we perform 
+            # an additional test to see if a slicer yields a nearby result. If it does, 
+            # the result is like clicking on the slice and we get transparency for free.
+            pass
+
+        # Make sure we have depth peeling activated, otherwise transparency with volumes
+        # will look weird and in the wrong order
+        self.plot.renderer.UseDepthPeelingOn()
+        self.plot.renderer.UseDepthPeelingForVolumesOn()
+        
         segmented = self.volume_view.model.is_segmented()
         if segmented:
+            # This very line below will mess up the entire slice coloring if:
+            # - you have a segmented volume and this is set to True
+            # - you have a non-segmented (like raw MRI, CT) volume and this is set to False
             mapper.SetInterpolateScalarsBeforeMapping(not segmented)
         mapper.Update()
 
@@ -1634,9 +1662,9 @@ class SlicerView():
         :param i: I index
         """
         self.set_slice_type(0)
-        nx, ny, nz = self.volume_view.actor.imagedata().GetDimensions()
-        #if i > nx-1:
-            #i = nx-1
+        nx, ny, nz = self.volume_view.actor.GetMapper().GetInput().GetDimensions()
+        if i <= 1 or i > nx - 1:
+            return False
         self.filter.SetExtent(i, i, 0, ny, 0, nz)
         self.filter.Update()
         if self.actor is not None:
@@ -1645,7 +1673,7 @@ class SlicerView():
             self.actor = vedo.Mesh(self.filter.GetOutput())
             self.initialize_mapper()
         self.got_slice = True
-        return self.actor
+        return True
 
     def y_slice(self, j):
         """
@@ -1653,9 +1681,10 @@ class SlicerView():
         :param j: J index
         """
         self.set_slice_type(0)
-        nx, ny, nz = self.volume_view.actor.imagedata().GetDimensions()
-        #if j > ny-1:
-            #j = ny-1
+        #nx, ny, nz = self.volume_view.model.dimensions / resolution
+        nx, ny, nz = self.volume_view.actor.GetMapper().GetInput().GetDimensions()
+        if j <= 1 or j > ny - 1:
+            return False
         self.filter.SetExtent(0, nx, j, j, 0, nz)
         self.filter.Update()
         if self.actor is not None:
@@ -1664,7 +1693,7 @@ class SlicerView():
             self.actor = vedo.Mesh(self.filter.GetOutput())
             self.initialize_mapper()
         self.got_slice = True
-        return self.actor
+        return True
 
     def z_slice(self, k):
         """
@@ -1672,9 +1701,9 @@ class SlicerView():
         :param k: K index
         """
         self.set_slice_type(0)
-        nx, ny, nz = self.volume_view.actor.imagedata().GetDimensions()
-        #if k > nz-1:
-            #k = nz-1
+        nx, ny, nz = self.volume_view.actor.GetMapper().GetInput().GetDimensions()
+        if k <= 1 or k > nz - 1:
+            return False
         self.filter.SetExtent(0, nx, 0, ny, k, k)
         self.filter.Update()
         if self.actor is not None:
@@ -1683,7 +1712,7 @@ class SlicerView():
             self.actor = vedo.Mesh(self.filter.GetOutput())
             self.initialize_mapper()
         self.got_slice = True
-        return self.actor
+        return True
 
     def slice_on_axis(self, value=None, normal=None, axis=None, use_reslice=False):
         """
@@ -1695,7 +1724,7 @@ class SlicerView():
             the normal is not aligned to either X, Y or Z. If you use it on an axis-aligned
             normal, some color inaccuracies will appear if you don't tweak the vtkImageResliceMapper.
             This is why the default is False.
-        :return: Mesh actor
+        :return: Result boolean, whether slice occured or not
         """
         resolution = self.volume_view.model.resolution
         volume_dimensions = self.volume_view.model.dimensions
@@ -1713,26 +1742,30 @@ class SlicerView():
             return
 
         if axis == 0:
-            new_slice = self.x_slice(in_volume_slice)
+            result = self.x_slice(in_volume_slice)
+        elif axis == 1:
+            result = self.y_slice(in_volume_slice)
         elif axis == 2:
-            new_slice = self.z_slice(in_volume_slice)
-        else:
-            new_slice = self.y_slice(in_volume_slice)
-        return new_slice
+            result = self.z_slice(in_volume_slice)
+        return result
 
     def update(self):
         """
         Update slice object according to data in the model
         """
         had_slice = self.got_slice
+        result = True
         if isinstance(self.model.axis, int) and 0 <= self.model.axis <= 2:
-            self.slice_on_axis(self.model.value, self.model.normal, self.model.axis)
+            result = self.slice_on_axis(self.model.value, self.model.normal, self.model.axis)
         else:
             self.slice_on_normal(self.model.origin, self.model.normal)
-        #self.actor.pos(*(self.volume_view.actor.pos()-self.actor.pos()))
 
-        #if not (not had_slice and self.got_slice):
-            #return
+        if not result:
+            self.plot.remove(self.actor)
+            self.got_slice = False
+            return
+
+        #self.actor.pos(*(self.volume_view.actor.pos()-self.actor.pos()))
         lut = self.volume_view.model.luts.current
         if lut is not None:
             '''

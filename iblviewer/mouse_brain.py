@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import requests
 from pathlib import Path
+import textwrap
 
 import nrrd
 import ibllib.atlas
@@ -135,8 +136,7 @@ class IBLAtlasModel():
     The volume is also modified such that it fits functional needs.
     """
     origin: np.ndarray = IBL_BREGMA_ORIGIN
-    # Instance of ibllib.atlas.AllenAtlas
-    atlas: Any = None
+    atlas: ibllib.atlas.AllenAtlas = None
     atlas_lut: LUTModel = None
     atlas_mapping_ids: list = None
     ibl_back_end: bool = True
@@ -406,7 +406,7 @@ class MouseBrainViewer(Viewer):
         
     def initialize(self, resolution=25, mapping='Beryl', add_atlas=True, add_dwi=False, 
                     dwi_color_map='viridis', dwi_alpha_map=None, local_allen_volumes_path=None,
-                    context=None, embed_ui=False, embed_font_size=16, web_ui=False, jupyter=False, offscreen=False, 
+                    offscreen=False, jupyter=False, embed_ui=False, embed_font_size=15, 
                     plot=None, plot_window_id=0, num_windows=1, render=False, dark_mode=False):
         """
         Initialize the controller, main entry point to the viewer
@@ -425,17 +425,22 @@ class MouseBrainViewer(Viewer):
             to have multiple windows with other stats or let the controller create a new one
         :param plot_window_id: Sub-window id where the 3D visualization will be displayed
         :param num_windows: Number of subwindows, in case you want to display your own stuff later
-        :param render: Whether rendering occurs at the end of the initialization or not. Defaults to False
         :param dark_mode: Whether the viewer is in dark mode
         """
         self.model.title = 'IBL Viewer'
-        super().initialize(context, embed_ui, embed_font_size, web_ui, jupyter, offscreen, 
-                            plot, plot_window_id, num_windows, render, dark_mode)
 
-        # ibllib works with two volumes at the same time: the segmented volume (called 'label') and the DWI volume (called 'image')
+        # ibllib works with two volumes at the same time: the segmented volume (called 'label') 
+        # and the DWI volume (called 'image')
         self.ibl_model = IBLAtlasModel()
         self.ibl_model.initialize(resolution, local_allen_volumes_path)
         self.model.origin = self.ibl_model.origin
+
+        # Neuroscience specific
+        self.model.probe_initial_point1 = self.model.origin
+        self.model.probe_initial_point2 = self.model.origin + [0, 0, 8000]
+
+        super().initialize(offscreen, jupyter, embed_ui, embed_font_size,
+                            plot, plot_window_id, num_windows, dark_mode)
 
         # A VolumeController has a unique volume as target so if we want to visualize both volumes, we create two views
         if add_atlas:
@@ -501,24 +506,67 @@ class MouseBrainViewer(Viewer):
         self.bounding_mesh.pos(np.array([-100+self.ibl_model.resolution, 0.0, 0.0]))
         #self.bounding_mesh.mapper().SetClippingPlanes(self.clipping_planes)
 
-    def update_info(self):
+    def find_region(self, term):
         """
-        Update text and point information for the current selection
+        Find a region with a substring
+        :param term: Search term
+        :return: List of matching entries and the corresponding mask
         """
-        super().update_info()
-        if self.atlas_controller is None:
+        # ibl_model.atlas.regions is a BrainRegion object that puts a pandas dataframe
+        # into separate numpy arrays (like 'name') so we work on a numpy array here
+        mask = np.flatnonzero(np.char.find(self.ibl_model.atlas.regions.name.astype(str), term) != -1)
+        return mask
+
+    def get_region_names(self):
+        """
+        Get the region names
+        :return: List
+        """
+        return self.ibl_model.atlas.regions.name.tolist()
+
+    def _select(self, actor=None, controller=None, event=None, 
+                    camera_position=None, position=None, value=None):
+        """
+        Define the current object selected
+        :param actor: a vtkActor
+        :param controller: Controller of the given actor (optional)
+        :param event: a vedo event from which we use picked3d and picked2d (we could directly use vtk)
+        :param camera_position: position of the camera (optional) at selection time
+        :param position: The final position computed on the volume or mesh or point or line.
+            If not given, this will be automatically calculated
+        .param value: The value corresponding to the point on the object. If not given, this will
+            be automatically retrieved
+        """
+        super()._select(actor, controller, event, camera_position, position, value)
+        extra_data = self.ibl_model.get_mapped_data(self.model.selection_value)
+        if extra_data is None:
             return
+        # This is where we retrieve neuroscience specific data about our selection
         selection = self.model.selection
-        data = None
         if selection == self.atlas_controller.actor or self.is_probe(selection):
-            data = self.ibl_model.get_mapped_data(self.model.selection_value)
-        if data is None:
-            return
-        text = self.selection_info.GetMapper().GetInput()
-        text += f'\n{data["region_name"]}'
-        if data.get('scalar') is not None:
-            text += f'\n\nScalar value: {data["scalar"]}'
-        self.selection_info.GetMapper().SetInput(text)
+            self.model.selection_related_name = extra_data.get('region_name')
+            self.model.selection_related_value = extra_data.get('scalar')
+
+    def get_selection_info(self, line_length=40, precision=5):
+        """
+        Get information about the current selection
+        :param line_length: Region name line length after what it's word-wrapped
+        :param precision: Scalar value floating precision displayed
+        :return: Preformatted multiline text and a dictionary of extra data
+        """
+        text, data = super().get_selection_info()
+        if self.atlas_controller is None:
+            return text, data
+        region_name = self.model.selection_related_name
+        scalar = self.model.selection_related_value
+        if region_name is not None:
+            if isinstance(line_length, int):
+                lines = textwrap.wrap(region_name, line_length, break_long_words=True)
+                region_name = '\n'.join(lines)
+            text += f'\nRegion: {region_name}'
+        if scalar:
+            text += f'\n\nScalar value: {scalar:.{precision}f}'
+        return text, data
 
     def add_origin(self):
         """
@@ -555,11 +603,53 @@ class MouseBrainViewer(Viewer):
             self.plot.add(point_cloud)
         return point_cloud
 
+    def add_spheres(self, positions, radius=10, values=None, color_map='Accent', name='Spheres',
+                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, 
+                    bounding_mesh=None, ibl_flip_yz=True, **kwargs):
+        """
+        Add new spheres
+        :param positions: 3D array of coordinates
+        :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
+            in case as_spheres is False.
+        :param values: 1D array of values, one per neuron or a time series of such 1D arrays (numpy format)
+        :param color_map: A color map, it can be a color map built by IBLViewer or 
+            a color map name (see vedo documentation), or a list of values, etc.
+        :param name: All point neurons are grouped into one object, you can give it a custom name
+        :param use_origin: Whether the origin is added as offset to the given positions
+        :param add_to_scene: Whether the new lines are added to scene/plot and rendered
+        :param noise_amount: Amount of 3D random noise applied to each point. Defaults to 0
+        :param trim_outliers: If bounding_mesh param is given, then the spheres will be trimmed,
+            only the ones inside the bounding mesh will be kept
+        :param bounding_mesh: A closed manifold surface mesh used for trimming segments. If None,
+            the current self.bounding_mesh is used (if it exists)
+        :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
+            on Y and Z axes in order to match Allen Brain Atlas volume and how it's stored by IBL.
+        :return: objects.Points
+        """
+        axes = [1, 1, 1]
+        if ibl_flip_yz:
+            axes = [1, -1, -1]
+            positions = np.array(positions) * [axes]
+        if noise_amount is not None:
+            positions += np.random.rand(len(positions), 3) * noise_amount
+        link = True if add_to_scene and not trim_outliers else False
+        spheres = super().add_spheres(positions, radius, values, color_map, 
+                                    name, use_origin, link, **kwargs)
+        spheres.axes = axes
+        if bounding_mesh is None:
+            bounding_mesh = self.bounding_mesh
+        if trim_outliers and bounding_mesh is not None:
+            spheres.cutWithMesh(bounding_mesh)
+            spheres.mapper().SetScalarVisibility(True)
+            if add_to_scene:
+                self.plot.add(spheres)
+        return spheres
+
     def add_points(self, positions, radius=10, values=None, color_map='Accent', name='Points', screen_space=False,
                     use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, bounding_mesh=None, 
                     ibl_flip_yz=True, **kwargs):
         """
-        Add new points as circles or spheres
+        Add new points
         :param positions: 3D array of coordinates
         :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
             in case as_spheres is False.
@@ -568,15 +658,13 @@ class MouseBrainViewer(Viewer):
             a color map name (see vedo documentation), or a list of values, etc.
         :param name: All point neurons are grouped into one object, you can give it a custom name
         :param screen_space: Type of point, if True then the points are static screen-space points.
-            If False, then the points are spheres. You see them larger when you zoom closer to them,
-            while this is not the case with screen-space points. Defaults to False.
+            If False, then the points are made to scale in 3D, ie you see them larger when you 
+            zoom closer to them, while this is not the case with screen-space points. Defaults to False.
         :param use_origin: Whether the origin is added as offset to the given positions
-        :param noise_amount: Amount of 3D random noise applied to each point. Defaults to 0
-        :param as_spheres: Whether the points are spheres, which means their size is relative to 
-            the 3D scene (they will get bigger if you move the camera closer to them). On the other hand,
-            if points are rendered as points, their radius in pixels will be constant, however close or
-            far you are from them (which can lead to unwanted visual results)
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
+        :param noise_amount: Amount of 3D random noise applied to each point. Defaults to 0
+        :param trim_outliers: If bounding_mesh param is given, then the spheres will be trimmed,
+            only the ones inside the bounding mesh will be kept
         :param bounding_mesh: A closed manifold surface mesh used for trimming segments. If None,
             the current self.bounding_mesh is used (if it exists)
         :param ibl_flip_yz: If you have an IBL data set, its 3D coordinates will be multiplied by -1
@@ -734,25 +822,6 @@ class MouseBrainViewer(Viewer):
             transpose = self.ibl_transpose
         return super().add_volume(data, resolution, file_path, color_map, 
                                 alpha_map, select, add_to_scene, transpose)
-
-    def update_reveal_region(self, widget=None, event=None, value=0.0):
-        """
-        Update a given slicer with the given value
-        :param widget: Widget instance (given by the event caller)
-        :param event: Event (given by the event caller)
-        :param value: Value of Z slice, defaults to 0.0
-        """
-        if widget is not None and event is not None:
-            value = widget.GetRepresentation().GetValue()
-        self.reveal_region(value)
-
-    def reveal_region(self, label): #invert=False
-        """
-        Reveal some labelled regions in a segmented volume
-        :param label: Scalar value of the region
-        """
-        actor = self.view.volume.isosurface(label)
-        self.plot.add(actor)
 
     def set_left_view(self):
         """

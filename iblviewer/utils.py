@@ -81,6 +81,72 @@ def spherical_degree_angles_to_xyz(radius, theta, phi):
     return vedo.spher2cart(radius, theta / 180 * math.pi, phi / 180 * math.pi) 
 
 
+def pick_object(plot, event_name=None, priority=None, cid=None):
+    """
+    Pick an object
+    """
+    x, y = plot.interactor.GetEventPosition()
+    plot.renderer = plot.interactor.FindPokedRenderer(x, y)
+    if not plot.picker:
+        plot.picker = vtk.vtkPropPicker()
+    plot.picker.PickProp(x, y, plot.renderer)
+    plot.picked2d = (x,y)
+    xp, yp = plot.interactor.GetLastEventPosition()
+    actor = plot.picker.GetProp3D()
+    delta3d = np.array([0,0,0])
+    picked3d = None
+    picker = plot.picker
+    if actor is None:
+        # Ok, this is tricky. I found out that vtkPropPicker, even
+        # if it optimized, can fail at detecting a simple mesh
+        # so we use the vtkPicker as fall back plan
+        picker = vtk.vtkPicker()
+        picker.Pick(x, y, 0.0, plot.renderer)
+        actor = picker.GetProp3D()
+    if actor is not None:
+        picked3d = np.array(picker.GetPickPosition())
+        if isinstance(actor, vedo.Mesh):
+            # There is a bug with transparent objects or objects that do not have ForceOpaqueOn()
+            # which prevents picked3d from being valid so we have to use another picking method
+            cell_picker = vtk.vtkCellPicker()
+            cell_picker.Pick(x, y, 0.0, plot.renderer)
+            if cell_picker.GetProp3D() == actor:
+                picked3d = np.array(cell_picker.GetPickPosition())
+        try:
+            if actor.picked3d is not None:
+                delta3d = picked3d - actor.picked3d
+            actor.picked3d = picked3d
+        except AttributeError:
+            return
+    else:
+        actor = plot.picker.GetActor2D()
+
+    dx, dy = x-xp, y-yp
+
+    event_dict = vedo.utils.dotdict({
+        "name": event_name,
+        "id": cid,
+        "priority": priority,
+        "at": plot.renderers.index(plot.renderer),
+        "actor": actor,
+        "picked3d": picked3d,
+        "keyPressed": plot.interactor.GetKeySym(),
+        "picked2d": (x,y),
+        "delta2d": (dx, dy),
+        "angle2d": np.arctan2(dy,dx),
+        "speed2d": np.sqrt(dx*dx+dy*dy),
+        "delta3d": delta3d,
+        "speed3d": np.sqrt(np.dot(delta3d,delta3d)),
+        "isPoints":   isinstance(actor, vedo.Points),
+        "isMesh":     isinstance(actor, vedo.Mesh),
+        "isAssembly": isinstance(actor, vedo.Assembly),
+        "isVolume":   isinstance(actor, vedo.Volume),
+        "isPicture":  isinstance(actor, vedo.Picture),
+        "isActor2D":  isinstance(actor, vtk.vtkActor2D)
+    })
+    return event_dict
+
+
 def add_callback(plot, event_name, func, priority=0.0):
     """
     Modified function from vedo. The issue is that the way vedo (and pyvista for that matter)
@@ -110,57 +176,13 @@ def add_callback(plot, event_name, func, priority=0.0):
     if not plot.interactor:
         return None
 
-    # Processing names is removed from original function
-
-    def _func_wrap(iren, ename):
-        x, y = plot.interactor.GetEventPosition()
-        plot.renderer = plot.interactor.FindPokedRenderer(x, y)
-        if not plot.picker:
-            plot.picker = vtk.vtkPropPicker()
-        plot.picker.PickProp(x, y, plot.renderer)
-        plot.picked2d = (x,y)
-        xp, yp = plot.interactor.GetLastEventPosition()
-        actor = plot.picker.GetProp3D()
-        delta3d = np.array([0,0,0])
-        picked3d = None
-        if actor is not None:
-            picked3d = np.array(plot.picker.GetPickPosition())
-            try:
-                if actor.picked3d is not None:
-                    delta3d = picked3d - actor.picked3d
-                actor.picked3d = picked3d
-            except AttributeError:
-                return
-        else:
-            actor = plot.picker.GetActor2D()
-
-        dx, dy = x-xp, y-yp
-
-        event_dict = vedo.utils.dotdict({
-            "name": ename,
-            "id": cid,
-            "priority": priority,
-            "at": plot.renderers.index(plot.renderer),
-            "actor": actor,
-            "picked3d": picked3d,
-            "keyPressed": plot.interactor.GetKeySym(),
-            "picked2d": (x,y),
-            "delta2d": (dx, dy),
-            "angle2d": np.arctan2(dy,dx),
-            "speed2d": np.sqrt(dx*dx+dy*dy),
-            "delta3d": delta3d,
-            "speed3d": np.sqrt(np.dot(delta3d,delta3d)),
-            "isPoints":   isinstance(actor, vedo.Points),
-            "isMesh":     isinstance(actor, vedo.Mesh),
-            "isAssembly": isinstance(actor, vedo.Assembly),
-            "isVolume":   isinstance(actor, vedo.Volume),
-            "isPicture":  isinstance(actor, vedo.Picture),
-            "isActor2D":  isinstance(actor, vtk.vtkActor2D)
-        })
+    # Processing names is removed from vedo function
+    # Also the whole thing is refactored with improved picking
+    def wrapper(iren=None, event_name=None):
+        event_dict = pick_object(plot, event_name, priority, cid)
         func(event_dict)
-        return
 
-    cid = plot.interactor.AddObserver(event_name, _func_wrap, priority)
+    cid = plot.interactor.AddObserver(event_name, wrapper, priority)
     return cid
 
 
@@ -264,9 +286,20 @@ def time_diff(t):
     return duration.total_seconds()
 
 
+def recompute_normals(target):
+    pdnorm = vtk.vtkPolyDataNormals()
+    pdnorm.SetInputData(target)
+    pdnorm.ComputePointNormalsOn()
+    pdnorm.ComputeCellNormalsOn()
+    pdnorm.FlipNormalsOff()
+    pdnorm.ConsistencyOn()
+    pdnorm.Update()
+    return pdnorm.GetOutput() #self._data
+
+
 def get_actor_center(actor):
     """
-    Get center position of an actor
+    Get the absolute center position of an actor
     :param actor: VTK actor
     :return: 3d array
     """
@@ -279,9 +312,28 @@ def get_actor_center(actor):
         raise e
 
 
+def get_actor_bounds(actor):
+    """
+    Get the bounds of an actor as xmin, xmax, ymin, ymax, zmin, zmax
+    :param actor: VTK actor
+    :return: Array with 6 values
+    """
+    if actor is None:
+        return
+    try:
+        if isinstance(actor, vedo.Volume):
+            d = actor.dimensions() * actor.spacing()
+            c = get_actor_center(actor)
+            return c[0] - d[0], c[0] + d[0], c[1] - d[1], c[1] + d[1], c[2] - d[2], c[2] + d[2]
+        else:
+            return actor.bounds()
+    except Exception as e:
+        raise e
+
+
 def get_actor_dimensions(actor):
     """
-    Get dimensions of an actor
+    Get the dimensions of an actor
     :param actor: VTK actor
     :return: 3d array
     """
@@ -342,6 +394,24 @@ def get_transformation_matrix(origin, normal):
     return M, T
 
 
+def set_clipping_planes(target, planes, flip_normals=False):
+    """
+    Clip the volume and move the slicing planes according the given planes
+    :param target: vedo.Mesh (can be iblviewer.objects.Points or similar)
+    :param planes: vtkPlanes
+    :param flip_normals: Whether clipping normals are flipped
+    """
+    if not isinstance(planes, vtk.vtkPlanes):
+        bounds = planes
+        planes = vtk.vtkPlanes()
+        planes.SetBounds(bounds)
+    if flip_normals:
+        for plane_id in range(planes.GetNumberOfPlanes()):
+            plane = planes.GetPlane(plane_id)
+            plane.SetNormal(np.array(plane.GetNormal())*-1)
+    target.GetMapper().SetClippingPlanes(planes)
+
+
 def probe(plot, target, widget=None, interaction_callback=None, point1=None, point2=None, 
             place_factor=1, handle_size=0.005, color=None):
     """
@@ -366,7 +436,7 @@ def probe(plot, target, widget=None, interaction_callback=None, point1=None, poi
         widget.SetInteractor(plot.interactor)
         widget.SetPlaceFactor(place_factor)
         widget.SetHandleSize(handle_size)
-    widget.SetInputData(target.inputdata())
+    widget.SetInputData(target.GetMapper().GetInput())
     
     if color is None:
         color = [0.5, 0.5, 0.5]
@@ -408,13 +478,13 @@ def box_widget(plot, target, interaction_callback=None, place_factor=1,
     widget.SetPlaceFactor(place_factor)
     widget.SetHandleSize(handle_size)
     # TODO: handle the update event in volumes in order to choose
-    # the best method, either axis-aligned slicing in case normals
-    # are axis-aligned, or using vtkImageReslice. Everything is coded
-    # in VolumeView already.
+    # the best method, either axis-aligned slicing when normals
+    # are axis-aligned, or slicing with vtkImageReslice. 
+    # Both functionalities are available in VolumeView already.
     widget.RotationEnabledOff()
     widget.ScalingEnabledOn()
     widget.TranslationEnabledOn()
-    widget.SetInputData(target.inputdata())
+    widget.SetInputData(target.GetMapper().GetInput())
     plot.cutterWidget = widget
     
     # Only valid for vtkBoxWidget
@@ -427,7 +497,7 @@ def box_widget(plot, target, interaction_callback=None, place_factor=1,
     #widget.GetOutlineProperty().SetOpacity(0.7)
 
     #widget.SetRepresentationToOutline()
-    existing_planes = target.mapper().GetClippingPlanes()
+    existing_planes = target.GetMapper().GetClippingPlanes()
     if existing_planes is not None:
         bounds = get_planes_bounds(existing_planes)
         widget.PlaceWidget(bounds)
@@ -442,7 +512,7 @@ def box_widget(plot, target, interaction_callback=None, place_factor=1,
             return
         clipping_planes = vtk.vtkPlanes()
         widget.GetPlanes(clipping_planes)
-        target.mapper().SetClippingPlanes(clipping_planes)
+        target.GetMapper().SetClippingPlanes(clipping_planes)
 
     if interaction_callback is None:
         interaction_callback = clip_target

@@ -119,7 +119,8 @@ class Points(vedo.Points):
         :param screen_space: Whether the points are rendered as screen-space points or as
             spheres. The main difference is that screen-space is very fast and can display millions
             of points whereas sphere mode allows you to zoom in on a point and you will see it
-            bigger up-close with a perspective camera.
+            bigger up-close with a perspective camera, but if you get too close, you will see that 
+            the sphere is actually made of several scaled screen-space points.
         :param alpha: Alpha/opacity value
         :param res: Resolution of the point if screen-space is disabled
         :param min_v: Minimum value for the given values (will be computed if not given)
@@ -133,17 +134,19 @@ class Points(vedo.Points):
         # Multi component (ndimensional) arrays in vtk:
         # https://vtk.org/doc/nightly/html/classvtkAbstractArray.html#a528de7a4879a219e7f82a82130186dc8
         polydata = vtk.vtkPolyData()
-        points = vtk.vtkPoints()
+        points = vtk.vtkPointSource()
         num_points = len(positions)
         points.SetNumberOfPoints(num_points)
+        points.Update()
         #for p_id in range(num_points):
             #points.SetPoint(p_id, positions[p_id])
         if not isinstance(positions, np.ndarray):
             positions = np.array(positions)
         positions = positions.astype(float)
         points_data = numpy_to_vtk(np.ascontiguousarray(positions), deep=True)
-        points.SetData(points_data)
-        polydata.SetPoints(points)
+        #polydata.SetPoints(points)
+        polydata = points.GetOutput()
+        polydata.GetPoints().SetData(points_data)
 
         # We have to set scalar values after the object is created because VTK automatically
         # creates some array values initially and we want to ignore them later on
@@ -207,7 +210,6 @@ class Points(vedo.Points):
             
             #glyph.SetVectorModeToUseVector()
             #glyph.OrientOn()
-
             glyph.ClampingOn()
             if len(scalars) > 0:
                 # If a value == min_v, then the point has radius 0
@@ -218,7 +220,7 @@ class Points(vedo.Points):
             glyph.SetScaleModeToScaleByScalar()
             
             glyph.SetScaleMode(3)
-
+            
             '''
             For further work:
 
@@ -244,8 +246,12 @@ class Points(vedo.Points):
             '''
 
         glyph.Update()
-        vedo.Points.__init__(self, glyph.GetOutput(), alpha=alpha)
+        vedo.Mesh.__init__(self, glyph.GetOutput(), alpha=alpha)
         mapper = self._mapper
+
+        self._polydata = polydata
+        self.source = glyph
+        self.name = 'Points'
 
         if screen_space:
             #self.GetProperty().SetColor(*color)
@@ -262,10 +268,6 @@ class Points(vedo.Points):
         if ctf is not None:
             mapper.SetLookupTable(ctf)
         mapper.Update()
-
-        self._polydata = polydata
-        self.source = glyph
-        self.name = 'Points'
 
     def get_number_of_arrays(self, ignore=['GlyphScale', 'Normals']):
         """
@@ -314,7 +316,7 @@ class Points(vedo.Points):
 class Spheres(vedo.Mesh):
     """
     Reimplementation of vedo.Spheres that was not handling things properly
-    when it comes to set time series and visualise them with colors.
+    when it comes to setting time series and to visualising them with colors.
 
     This class isn't used at the moment. Points is preferred as it acts either as
     vedo.Spheres or as screen space Points depending on screen_space param.

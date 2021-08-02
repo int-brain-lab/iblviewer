@@ -1,4 +1,11 @@
-from one.api import ONE
+# This code connects to IBL back end and resolves
+# all point neurons (channels) measured in all
+# valid experiments.
+try:
+    from oneibl.one import ONE
+except ImportError:
+    # Then we're on ONE2
+    from one.api import ONE
 import os
 import pickle
 import numpy as np

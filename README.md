@@ -5,6 +5,8 @@ Most of the viewer makes VTK usable as an interactive application and you may us
 
 The small added part related to IBL allows scientists to view their data and models for further analysis. From electrophysiological data to neuronal connectivity, this tool allows simple and effective 3D visualization for many use-cases like multi-slicing and time series even on volumes. In that case, you will use `from iblviewer.mouse_brain import MouseBrainViewer`
 
+This viewer is also featured with an optional QT user interface with more advanced functionalities like dynamic statistics. In the terminal, type `iblviewer` and see what parameters are available. The viewer launches by default with a Qt UI.
+
 ## Installation
 ```bash
 pip install git+https://github.com/int-brain-lab/iblviewer.git
@@ -65,11 +67,11 @@ viewer.initialize(resolution=50, mapping='Allen', add_atlas=True,
 viewer.show()
 ```
 
-[Volumetric time series](examples/neuroscience/ibl_volume_mapping.py) of values assigned to brain regions.
+[Volumetric time series](examples/ibl_volume_mapping.py) of values assigned to brain regions.
 
-[Point neurons](examples/neuroscience/ibl_point_neurons.py) and connectivity data.
+[Point neurons](examples/ibl_point_neurons.py) and connectivity data.
 
-[Insertion probes](examples/neuroscience/ibl_insertion_probes.py), or how to display lines made of an heterogeneous amount of points. This example requires valid credentials to IBL back-end.
+[Insertion probes](examples/ibl_insertion_probes.py), or how to display lines made of an heterogeneous amount of points. This example requires valid credentials to IBL back-end.
 
 Since this tool is built on top of VTK and [vedo](https://github.com/marcomusy/vedo), a wrapper for VTK that makes it easy to use, you have endless possibilities for plotting and visualizing your data.
 
