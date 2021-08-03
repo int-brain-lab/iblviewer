@@ -104,21 +104,33 @@ class DataViewer():
         :param statistics: MplCanvas instance (mandatory)
         :param viewer: MouseBrainViewer instance (mandatory)
         """
-        # Clear previous plot
+        # Clear previous plot (nothing visible appears until you call draw())
         statistics.axes.clear()
 
         # Prepare new one
         agg_df = self.aggregated_df
+        statistics.axes.set_xlabel('Brain regions (none selected)')
+        # First scatter all values
         statistics.axes.scatter(self.df.acronym, self.df.value, alpha=0.2, s=8)
+        statistics.axes.set_xticks([''])
         # There are multiple ways to retrieve the acronym, here's one
         acronyms = agg_df.index[agg_df.value == viewer.model.selection_related_value].tolist()
         if acronyms is None or len(acronyms) < 1:
+            # Do not forget to draw before we return!
+            statistics.draw()
             return
-        acronym = acronyms[0]
-        selected_data = self.df.value[self.df.acronym == acronym]
-        selected_data.dropna(inplace=True)
-        statistics.axes.scatter(['']*len(selected_data), selected_data, color='yellow', s=32)
-        statistics.axes.set_xlabel('Brain regions')
+
+        # Then scatter the values on top of the previous scatter with the values from the selected region
+        for acronym in acronyms:
+            #selected_index = self.df.index[self.df.acronym == acronym]
+            selected_data = self.df.value[self.df.acronym == acronym]
+            #selected_index.dropna(inplace=True)
+            selected_data.dropna(inplace=True)
+            statistics.axes.scatter([acronym]*selected_data.size, selected_data, color='yellow', s=32)
+        
+        statistics.axes.set_xlabel(f'Selected region: {acronyms}')
+        # At last, draw the result
+        statistics.draw()
 
 
 def main():

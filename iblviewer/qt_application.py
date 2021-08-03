@@ -424,12 +424,10 @@ class ViewerWindow(Qt.QMainWindow):
         if not self.statistics_visible:
             return
         if self.statistics_function is not None:
-            plot = self.statistics_function(self.statistics, self.viewer)
-            if plot is not None:
-                self.statistics = plot
-            '''
             try:
-                self.statistics_function(self.statistics, self.viewer)
+                plot = self.statistics_function(self.statistics, self.viewer)
+                if plot is not None:
+                    self.statistics = plot
             except Exception as e:
                 e_type = type(e).__name__
                 msg = 'Your custom statistics function failed with error type ' + e_type
@@ -437,7 +435,6 @@ class ViewerWindow(Qt.QMainWindow):
                     msg += '\nMake sure your functions accepts two arguments (the statistics plot and the 3d viewer).'
                 print(msg)
                 print(e)
-            '''
         else:
             self.statistics.axes.clear()
             self.statistics.axes.plot(np.arange(20), np.random.random(20)/2)
