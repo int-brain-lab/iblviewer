@@ -3,7 +3,7 @@ import iblviewer.launcher
 
 setup(
     name = 'iblviewer', 
-    version='2.2.0',   
+    version='2.3.0',
     description='An interactive GPU-accelerated 3D viewer based on VTK',
     url='https://github.com/int-brain-lab/iblviewer',
     author='Nicolas Antille',
