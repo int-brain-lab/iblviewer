@@ -17,7 +17,11 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 from iblviewer.application import Viewer
-from iblviewer.mouse_brain import MouseBrainViewer
+got_ibllib = True
+try:
+    from iblviewer.mouse_brain import MouseBrainViewer
+except ModuleNotFoundError:
+    got_ibllib = False
 from vedo import Plotter
 import numpy as np
 
@@ -98,11 +102,14 @@ class ViewerWindow(Qt.QMainWindow):
         self.dark_mode = dark_mode
         if isinstance(kwargs, dict):
             self.kwargs = kwargs
-        if isinstance(viewer, MouseBrainViewer) or isinstance(viewer, Viewer):
-            self.viewer = viewer
-        if self.viewer is None:
-            self.viewer = MouseBrainViewer()
-        self.neuroscience_context = isinstance(self.viewer, MouseBrainViewer)
+        if got_ibllib:
+            if isinstance(viewer, MouseBrainViewer) or isinstance(viewer, Viewer):
+                self.viewer = viewer
+            if self.viewer is None:
+                self.viewer = MouseBrainViewer()
+            self.neuroscience_context = isinstance(self.viewer, MouseBrainViewer)
+        else:
+            self.neuroscience_context = False
 
         self.initialize_ui()
 
@@ -124,7 +131,10 @@ class ViewerWindow(Qt.QMainWindow):
         #if 'offscreen' in self.kwargs:
             #self.kwargs['offscreen'] = True
         if self.viewer is None:
-            self.viewer = MouseBrainViewer()
+            if got_ibllib:
+                self.viewer = MouseBrainViewer()
+            else:
+                self.viewer = Viewer()
 
         self.viewer.initialize(plot=self.plot, dark_mode=self.dark_mode, **self.kwargs)
         if self.viewer_function is not None:
@@ -321,8 +331,9 @@ class ViewerWindow(Qt.QMainWindow):
         self.show()
 
     def onViewerInitialized(self):
-        regions_data = self.viewer.get_region_names()
-        self.search_input.completer_model.setStringList(regions_data)
+        if self.neuroscience_context:
+            regions_data = self.viewer.get_region_names()
+            self.search_input.completer_model.setStringList(regions_data)
 
     def show_viewer(self):
         """

@@ -2,7 +2,12 @@ import argparse
 import numpy as np
 from iblviewer.qt_application import ViewerApp
 from iblviewer.application import Viewer
-from iblviewer.mouse_brain import MouseBrainViewer
+got_ibllib = True
+try:
+    from iblviewer.mouse_brain import MouseBrainViewer
+except ModuleNotFoundError:
+    got_ibllib = False
+
 
 """
 Project: IBL Viewer
@@ -101,7 +106,14 @@ class IBLViewer():
         :return: Either a qt_application.ViewerApp (if Qt) or a viewer instance (mouse_brain.MouseBrainViewer
             or application.)
         """
+        ibllib_msg = 'The viewer is set to start in neuroscience mode but you do not have ibllib '
+        ibllib_msg += 'optional module installed.\n\nPlease run pip install ibllib and run the viewer '
+        ibllib_msg += 'again if you want to start in neuroscience mode.\n\n'
+        ibllib_msg += 'Alternatively, you may use the viewer in standard mode with random points for test: iblviewer -neuro 0 -t 1\n'
         if jupyter:
+            if neuroscience and not got_ibllib:
+                print(ibllib_msg)
+                exit()
             if neuroscience:
                 # This a computational neuroscience environment, in this case focused
                 # on the Allen Brain Atlas and International Brain Laboratory data models
@@ -117,6 +129,12 @@ class IBLViewer():
             if args is None:
                 args = self.parse_args()
                 self.args = args
+
+        if args.neuroscience and not got_ibllib:
+            print(ibllib_msg)
+            exit()
+            # Fallback plan ?
+            #args.neuroscience = False
 
         if args.neuroscience:
             # This a computational neuroscience environment, in this case focused

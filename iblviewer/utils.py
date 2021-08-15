@@ -12,7 +12,7 @@ import math
 
 
 ROOT_FOLDER = Path(__file__).parent.parent
-ASSETS_FOLDER = ROOT_FOLDER.joinpath('./iblviewer/assets')
+ASSETS_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_assets')
 FONTS_FOLDER = ASSETS_FOLDER.joinpath('./fonts')
 EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_examples')
 EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_examples/data')
@@ -226,7 +226,7 @@ def get_surface_mesh_path(file_name, meshes_path=None, extension='ply', default_
             if default_meshes_path is not None:
                 region_mesh_path = default_meshes_path
             else:
-                region_mesh_path = 'https://raw.github.com/int-brain-lab/iblviewer/main/assets/surfaces/'
+                region_mesh_path = 'https://raw.github.com/int-brain-lab/iblviewer/main/iblviewer_assets/surfaces/'
             region_mesh_path += get_file_name(file_name, extension)
     else:
         region_mesh_path = str(os.path.join(meshes_path, get_file_name(file_name, extension)))

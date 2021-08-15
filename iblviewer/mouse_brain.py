@@ -454,7 +454,10 @@ class MouseBrainViewer(Viewer):
                 dwi_alpha_map = [0.0, 1.0, 1.0]
             self.add_atlas_dwi(dwi_color_map, dwi_alpha_map)
 
-        self.load_bounding_mesh()
+        try:
+            self.load_bounding_mesh()
+        except Exception:
+            pass
         
         #light = vedo.Light(self.model.IBL_BREGMA_ORIGIN - [0, 0, 1000], c='w', intensity=0.2)
         #self.plot.add(light)

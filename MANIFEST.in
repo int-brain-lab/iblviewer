@@ -1,3 +1,3 @@
-include assets/*
+recursive-include iblviewer_assets/*
 include iblviewer_examples/*
 include iblviewer_examples/data/*

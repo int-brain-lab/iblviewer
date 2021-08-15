@@ -19,10 +19,10 @@ pip install ibllib
 ```
 
 An example of mouse brain-wide map of electrophysiological recordings (seen here as point neurons) in the Allen Brain Atlas CCF v3 with both DWI and segmented volumes.
-![Viewer multi-volume and points rendering](iblviewer/assets/doc/iblviewer_v2_demo_brain_wide_map_1.jpg?raw=true)
+![Viewer multi-volume and points rendering](iblviewer_assets/doc/iblviewer_v2_demo_brain_wide_map_1.jpg?raw=true)
 
 Another example of the Qt UI with additional features like custom interactive statistics, in this case with matplotlib.
-![Viewer with stats in Qt](iblviewer/assets/doc/iblviewer_v2_demo_volume_mapping_qt.jpg?raw=true)
+![Viewer with stats in Qt](iblviewer_assets/doc/iblviewer_v2_demo_volume_mapping_qt.jpg?raw=true)
 
 ## Troubleshooting
 If at some point it complains about failing to uninstall vtk, it's likely that vtk is already installed within your conda environment and that it causes troubles (even if it's the proper version).
@@ -108,7 +108,7 @@ IBLViewer adds the following features:
 - interactive volumetric data mapping
 - mixing volumes and surfaces
 
-![UML schema](iblviewer/assets/doc/iblviewer_architecture.jpg?raw=true)
+![UML schema](iblviewer_assets/doc/iblviewer_architecture.jpg?raw=true)
 
 ## Issues and feature request
 Feel free to request features, submit PRs and raise issues.
