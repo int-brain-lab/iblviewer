@@ -995,6 +995,8 @@ class VolumeController():
                 normal = np.array(normal)*-1
             plane.SetNormal(normal)
             self.update_slicer(plane_id, origin, normal)
+        self.clipping_planes.Modified()
+        self.actor.GetMapper().Update()
 
     def set_alpha_map(self, alpha_map, alpha_factor=None):
         """

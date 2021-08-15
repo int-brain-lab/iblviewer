@@ -12,7 +12,8 @@ import math
 
 
 ROOT_FOLDER = Path(__file__).parent.parent
-ASSETS_FOLDER = ROOT_FOLDER.joinpath('./assets')
+ASSETS_FOLDER = ROOT_FOLDER.joinpath('./iblviewer/assets')
+FONTS_FOLDER = ASSETS_FOLDER.joinpath('./fonts')
 EXAMPLES_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_examples')
 EXAMPLES_DATA_FOLDER = ROOT_FOLDER.joinpath('./iblviewer_examples/data')
 
@@ -362,17 +363,26 @@ def get_bounding_planes(actor):
 
 def get_planes_bounds(planes):
     """
-    Get the bounding box of a series of planes
+    Get the bounding box coordinates of a series of planes.
+    [WARNING] Only works for six planes (box mode) at the moment
     :param planes: vtkPlaneCollection
     :return: 6 values
     """
     origins = list()
     for p_id in range(planes.GetNumberOfItems()):
-        origins.append(planes.GetItem(p_id).GetOrigin())
+        plane = planes.GetItem(p_id)
+        origin = np.array(plane.GetOrigin())
+        origins.append(origin)
+    # We don't want zeros to be accounted for so we select planes of interest
+    # First x planes, then y planes, then z ones. To be improved/generalized.
     origins = np.array(origins)
-    mn = np.min(origins, axis=0).tolist()
-    mx = np.max(origins, axis=0).tolist()
-    return mn[0], mx[0], mn[1], mx[1], mn[2], mx[2] 
+    mi_x = np.min(origins[:2], axis=0).tolist()
+    ma_x = np.max(origins[:2], axis=0).tolist()
+    mi_y = np.min(origins[2:4], axis=0).tolist()
+    ma_y = np.max(origins[2:4], axis=0).tolist()
+    mi_z = np.min(origins[4:6], axis=0).tolist()
+    ma_z = np.max(origins[4:6], axis=0).tolist()
+    return mi_x[0], ma_x[0], mi_y[1], ma_y[1], mi_z[2], ma_z[2]
 
 
 def get_transformation_matrix(origin, normal):
@@ -499,8 +509,14 @@ def box_widget(plot, target, interaction_callback=None, place_factor=1,
     #widget.SetRepresentationToOutline()
     existing_planes = target.GetMapper().GetClippingPlanes()
     if existing_planes is not None:
-        bounds = get_planes_bounds(existing_planes)
-        widget.PlaceWidget(bounds)
+        try:
+            bounds = get_planes_bounds(existing_planes)
+            widget.PlaceWidget(bounds)
+        except Exception:
+            msg = '[Warning] Object ' + target.name + ' does not have six clipping planes.'
+            msg += 'Placing widget is not supported atm in this configuration.'
+            print(msg)
+            widget.PlaceWidget(target.GetBounds())
     else:
         widget.PlaceWidget(target.GetBounds())
     

@@ -49,9 +49,11 @@ class UIModel:
 
     contexts = {DEFAULT: {}, CAMERA: {}, SCENE: {}, OBJECT: {}, DATA: {}, VIDEO_EXPORT: {}}
 
-    # TODO: run a test vedo.io.download(font, verbose=False, force=False) to check if 404, else select a dummy font
     # Font license is under https://raw.github.com/int-brain-lab/iblviewer/main/assets/fonts
-    font = 'https://raw.github.com/int-brain-lab/iblviewer/main/assets/fonts/SourceSansPro-Regular.ttf'
+    font_path = str(utils.FONTS_FOLDER)
+    font = 'SourceSansPro-Regular'
+    #font = 'https://raw.github.com/int-brain-lab/iblviewer/main/assets/fonts/SourceSansPro-Regular.ttf'
+
     # VTK is a nightmare for having a basic UI working...
     # and we need one when running in standalone or jupyter modes.
     font_size = 15
@@ -379,7 +381,12 @@ class Viewer():
         # This line is necessary as for some reason, 
         # vedo's allowInteraction kills the app when we listen to TimerEvents!
         vedo.settings.allowInteraction = False
+        vedo.settings.fonts_path = self.model.ui.font_path
         vedo.settings.defaultFont = self.model.ui.font
+        font_params = {'islocal':True}
+        if vedo.settings.font_parameters is None:
+            vedo.settings.font_parameters = {}
+        vedo.settings.font_parameters[self.model.ui.font] = font_params
         vedo.settings.enableDefaultKeyboardCallbacks = False
 
     def initialize(self, offscreen=False, jupyter=False, embed_ui=False, embed_font_size=15, 
@@ -738,6 +745,8 @@ class Viewer():
         Handle left mouse down event. The event is triggered for any "pickable" object
         :param mesh: Selected object
         """
+        if event is None:
+            return
         self.last_mouse_press_position = np.array(event.picked2d)
         self.left_mouse_down = True
 
@@ -785,6 +794,9 @@ class Viewer():
         # Handle mouse click release with a workaround for bad 
         # VTK event mgmt (LeftButtonReleaseEvent does not work)
         self.left_mouse_down = False
+
+        if event is None:
+            return
 
         drag_delta = np.linalg.norm(self.last_mouse_press_position - event.picked2d)
         # 2. If delta is larger than a few pixels, it means there was a click and drag
