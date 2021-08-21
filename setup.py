@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'iblviewer', 
-    version='2.4.2',
+    version='2.4.3',
     description='An interactive GPU-accelerated 3D viewer based on VTK',
     url='https://github.com/int-brain-lab/iblviewer',
     author='Nicolas Antille',
@@ -18,7 +18,7 @@ setup(
                       'k3d',
                       'vtk>=9.0',
                       'ipywebrtc',
-                      #'ibllib>=1.6.0',
+                      #'ibllib>=1.6.0', # This optional dependency is huge (100MB)!
                       'vedo>=2021.0.3',
                       'ipyvtklink',
                       'PyQt5',

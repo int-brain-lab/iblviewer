@@ -188,6 +188,8 @@ class IBLViewer():
 def main():
     app = IBLViewer()
     app.launch()
+    return app
 
 if __name__ == '__main__':
-    main()
+    app = main()
+    app.viewer.close()

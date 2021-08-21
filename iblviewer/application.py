@@ -34,7 +34,7 @@ class UIModel:
     SCENE = 'scene'
     OBJECT = 'object'
     DATA = 'data'
-    VIDEO_EXPORT = 'video_export'
+    EXPORT = 'export'
 
     visible: bool = True
     embed: bool = False
@@ -47,7 +47,7 @@ class UIModel:
     color: Any = '#000000'
     background_color: Any = '#ffffff'
 
-    contexts = {DEFAULT: {}, CAMERA: {}, SCENE: {}, OBJECT: {}, DATA: {}, VIDEO_EXPORT: {}}
+    contexts = {DEFAULT: {}, CAMERA: {}, SCENE: {}, OBJECT: {}, DATA: {}, EXPORT: {}}
 
     # Font license is under https://raw.github.com/int-brain-lab/iblviewer/main/assets/fonts
     font_path = str(utils.FONTS_FOLDER)
@@ -109,8 +109,8 @@ class UIModel:
     def is_data_context(self):
         return self.context == UIModel.DATA
 
-    def is_video_export_context(self):
-        return self.context == UIModel.VIDEO_EXPORT
+    def is_export_context(self):
+        return self.context == UIModel.EXPORT
 
     def is_valid_context(self, context):
         return context in self.contexts
@@ -444,6 +444,7 @@ class Viewer():
         
         self.model.ui.embed = embed_ui
         if self.model.ui.embed:
+            self.model.ui.visible = True
             self.model.ui.set_context(UIModel.DEFAULT)
             self.initialize_vtk_ui(self.model.ui.embed_menu_x, self.model.ui.embed_menu_y)
             self.update_ui()
@@ -806,6 +807,10 @@ class Viewer():
             self.clear_depth_picking()
             self.handle_drag_release(state, actor, event)
             return state
+
+        if event.isActor2D:
+            self.handle_actor2d_click(state, actor, event)
+            return
         
         picked3d = event.picked3d
         if self.last_mouse_release_position is not None:
@@ -890,9 +895,6 @@ class Viewer():
         self.depth_picking[actor] = event.picked3d
 
         state = 1
-        if event.isActor2D:
-            self.handle_actor2d_click(state, actor, event)
-            return
 
         # 5. Handle double click case
         if utils.time_diff(self.last_mouse_time) < 0.5:
@@ -1533,11 +1535,11 @@ class Viewer():
         """
         self.set_menu_context('time_series', UIModel.TIME_SERIES)
 
-    def video_export_context(self):
+    def export_context(self):
         """
-        Set video context
+        Set export context
         """
-        self.set_menu_context('video_export', UIModel.VIDEO_EXPORT)
+        self.set_menu_context('export', UIModel.EXPORT)
 
     def toggle_marker_type(self):
         """
@@ -1584,12 +1586,12 @@ class Viewer():
         self.add_button('scene', self.scene_context, [x, y+150], 'Scene', toggle=True)
         self.add_button('object', self.object_context, [x, y+100], 'Object', toggle=True)
         self.add_button('data', self.data_context, [x, y+50], 'Data', toggle=True)
-        self.add_button('video_export', self.video_export_context, [x, y], 'Video', toggle=True)
+        self.add_button('export', self.export_context, [x, y], 'Export', toggle=True)
         self.add_camera_embed_ui(sx, sy, sw)
         self.add_scene_embed_ui(sx, sy, sw)
         self.add_object_embed_ui(sx, sy, sw)
         self.add_data_embed_ui(sx, sy, sw)
-        self.add_video_export_embed_ui(sx, sy, sw)
+        self.add_export_embed_ui(sx, sy, sw)
 
     def add_camera_embed_ui(self, x, y, sw, nc=150):
         """
@@ -1633,8 +1635,8 @@ class Viewer():
 
         self.add_button('dark_mode', self.toggle_dark_mode, [x+400, y+80], 
                         ['Set dark mode', 'Set light mode'], toggle=True, state=0)
-        self.add_button('marker_type', self.toggle_marker_type, [x+400, y+40], 
-                        ['Marker type: Cross', 'Marker type: Sphere'], toggle=True, state=0)
+        self.add_button('marker', self.toggle_marker, [x+400, y+40], 
+                        ['Marker: Off', 'Marker: On'], toggle=True, state=1)
         #self.add_button('clickable', self.toggle_pickable, [x, y], ['Clickable: On', 'Clickable: Off'], toggle=True)
         self.add_button('toggle_info', self.toggle_info, [x+200, y+40], 
                         ['Info overlay: Off', 'Info overlay: On'], toggle=True, state=1)
@@ -1694,21 +1696,22 @@ class Viewer():
         self.add_button('move_probe', self.edit_probe, [x+180, y+40])
         self.model.ui.toggle_context(UIModel.DATA)
         
-    def add_video_export_embed_ui(self, x, y, sw):
+    def add_export_embed_ui(self, x, y, sw):
         """
-        Add video-export-context UI
+        Add export-context UI
         :param x: Base X position
         :param y: Base Y position (0 is at the bottom of the screen)
         :param sw: Slider width
         """
         s_kw = self.model.ui.slider_config
-        self.model.ui.toggle_context(UIModel.VIDEO_EXPORT)
-        self.add_button('export_turntable_video', self.export_turntable_video, [x, y], 'Export 360 video')
+        self.model.ui.toggle_context(UIModel.EXPORT)
+        self.add_button('export_image', self.export_image, [x, y], 'Export image')
+        self.add_button('export_turntable_video', self.export_turntable_video, [x + 150, y], 'Export 360 video')
         self.add_slider('video_duration', self.update_video_duration, 0, 60, 
-                        self.model.video_duration, [x, y+120, sw], 'Video duration (s)', **s_kw)
-        self.add_slider('start_angle', self.update_video_start_angle, 0, 360, 0, [x, y+75, sw], **s_kw)
-        self.add_slider('end_angle', self.update_video_end_angle, 0, 360, 360, [x, y+35, sw], **s_kw)
-        self.model.ui.toggle_context(UIModel.VIDEO_EXPORT)
+                        self.model.video_duration, [x + 150, y+120, sw], 'Video duration (s)', **s_kw)
+        self.add_slider('start_angle', self.update_video_start_angle, 0, 360, 0, [x + 150, y+80, sw], **s_kw)
+        self.add_slider('end_angle', self.update_video_end_angle, 0, 360, 360, [x + 150, y+40, sw], **s_kw)
+        self.model.ui.toggle_context(UIModel.EXPORT)
 
     def update_scene_ui(self, context_elements):
         """
@@ -3059,8 +3062,21 @@ class Viewer():
             if isinstance(controller, VolumeController):
                 controller.set_interactive_subsampling(on)
 
-    def export_turntable_video(self, file_name='visualization.mp4', start_angle=None, 
-                                end_angle=None, duration=None, fps=25):
+    def export_image(self, file_name='iblviewer.png', width=None, height=None, scale=2):
+        """
+        Export the current image to a file
+        :param file_name: File name with extension. PNG by default
+        :param width: Width in pixels. If None, the width of the window is used.
+        :param height: Height in pixels. If None, the height of the window is used.
+        :param scale: Scale factor to make the image larger. Defaults to 2.
+        """
+        ui_visibility = self.model.ui.visible
+        self.set_ui_visibility(False, ui_button_visible=False)
+        self.render(file_name, width, height, scale)
+        self.set_ui_visibility(ui_visibility)
+
+    def export_turntable_video(self, file_name='iblviewer.mp4', start_angle=0, 
+                                end_angle=360, duration=None, fps=25):
         """
         Export a sagittal turntable video of the viewer.
         :param file_name: File name
@@ -3069,8 +3085,12 @@ class Viewer():
         :param duration: Duration of the video
         :param fps: Frames per second, defaults to 25
         """
-        if start_angle is None or end_angle is None or duration is None or fps is None:
-            return
+        if self.model.ui.embed:
+            start_angle = self.widgets.get('start_angle').GetRepresentation().GetValue()
+            end_angle = self.widgets.get('end_angle').GetRepresentation().GetValue()
+            duration = self.widgets.get('video_duration').GetRepresentation().GetValue()
+        #if start_angle is None or end_angle is None or duration is None or fps is None:
+            #return
         if start_angle == end_angle:
             end_angle += 360
 
