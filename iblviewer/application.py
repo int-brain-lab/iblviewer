@@ -1634,7 +1634,7 @@ class Viewer():
         self.add_button('view_selected', self.view_selected, [x, y+80], 'Focus on selection')
 
         self.add_button('dark_mode', self.toggle_dark_mode, [x+400, y+80], 
-                        ['Set dark mode', 'Set light mode'], toggle=True, state=0)
+                        ['Dark UI', 'Light UI'], toggle=True, state=0 if self.model.ui.dark_mode else 1)
         self.add_button('marker', self.toggle_marker, [x+400, y+40], 
                         ['Marker: Off', 'Marker: On'], toggle=True, state=1)
         #self.add_button('clickable', self.toggle_pickable, [x, y], ['Clickable: On', 'Clickable: Off'], toggle=True)
@@ -2691,11 +2691,13 @@ class Viewer():
         """
         self.set_outline_visibility(not self.model.selection_outline_visible)
 
-    def set_outline_visibility(self, on=True):
+    def set_outline_visibility(self, on=None):
         """
         Set outline visibility
         :param on: Visibility boolean
         """
+        if on is None:
+            on = self.model.selection_outline_visible
         self.model.selection_outline_visible = on
         if self.outline_actor is not None:
             self.outline_actor.SetVisibility(on)
