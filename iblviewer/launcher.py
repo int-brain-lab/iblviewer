@@ -185,11 +185,12 @@ class IBLViewer():
             self.viewer.show()
             return self.viewer
 
-def main():
+def main(auto_close_viewer=True):
     app = IBLViewer()
     app.launch()
+    if auto_close_viewer:
+        app.viewer.close()
     return app
 
 if __name__ == '__main__':
     app = main()
-    app.viewer.close()

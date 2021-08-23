@@ -1,11 +1,14 @@
 try:
-    from iblviewer.mouse_brain import *
-    from iblviewer.qt_application import *
+    import iblviewer.mouse_brain
+    import iblviewer.qt_application
 except ModuleNotFoundError:
     pass
-from iblviewer.launcher import *
-from iblviewer.collection import *
-from iblviewer.objects import *
-from iblviewer.utils import *
-from iblviewer.volume import *
-from iblviewer.application import *
+import iblviewer.launcher
+import iblviewer.collection
+import iblviewer.objects
+import iblviewer.utils
+import iblviewer.volume
+import iblviewer.application
+
+if __name__ == '__main__':
+    app = iblviewer.launcher.main()
