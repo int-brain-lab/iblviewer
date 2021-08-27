@@ -7,6 +7,7 @@ import requests
 from pathlib import Path
 import textwrap
 
+import vedo
 import nrrd
 import ibllib.atlas
 from ibllib.atlas.regions import BrainRegions
@@ -724,12 +725,35 @@ class MouseBrainViewer(Viewer):
         axes = [1, 1, 1]
         if ibl_flip_yz:
             axes = [1, -1, -1]
-            points = np.array(points) * [axes]
+            points = np.array(points) * axes
             if end_points is not None:
                 end_points = np.array(end_points) * axes
         pre_add = True if add_to_scene and not trim_outliers else False
-        lines = super().add_segments(points, end_points, line_width, values, color_map, name, use_origin, 
-                                    pre_add, relative_end_points, spherical_angles, radians)
+        
+        #lines = super().add_segments(points, end_points, line_width, values, color_map, name, use_origin, 
+                                    #pre_add, relative_end_points, spherical_angles, radians)
+        '''
+        Crazy python stuff here [WARNING]
+        If the above line with super() is called, then the scope of self within super() is this one,
+        which is wrong. When we are in super, self should be the parent class.
+        '''
+        # Copy-paste from application.Viewer.add_segments, due to above reason
+        if end_points is None and spherical_angles is not None:
+            relative_end_points = True
+            spherical_angles = np.array(spherical_angles)
+            if radians:
+                end_points = spherical_angles.apply(vedo.spher2cart)
+            else:
+                end_points = spherical_angles.apply(utils.spherical_degree_angles_to_xyz)
+            if relative_end_points:
+                end_points += points
+            points = np.c_[points, end_points].reshape(-1, 2, 3)
+        elif end_points is not None and len(points) != len(end_points):
+            n = min(len(points), len(end_points))
+            logging.error(f'[add_segments() error] Mismatch between start and end points length. Only {n} segments shown.')
+            points = np.c_[points[n], end_points[n]].reshape(-1, 2, 3)
+        lines = super().add_lines(points, line_width, values, color_map, name, use_origin, pre_add)
+
         lines.axes = axes
         if bounding_mesh is None:
             bounding_mesh = self.bounding_mesh
