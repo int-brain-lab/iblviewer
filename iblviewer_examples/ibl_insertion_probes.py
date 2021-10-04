@@ -6,6 +6,7 @@ except ImportError:
     from one.api import ONE
 import numpy as np
 
+import argparse
 from iblviewer.launcher import IBLViewer
 
 
@@ -96,12 +97,29 @@ class ProbeData:
         return lines
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    elif v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def main():
+    # More parsing options are added in parse_args() method below.
+    # -> Please check that you don't override any existing argument name!
+    parser = argparse.ArgumentParser(description='International Brain Viewer based on VTK')
+    parser.add_argument('-seg', dest='segments', type=str2bool, default=False, 
+    help='Whether line probes are simplified to segments. Defaults to 0 (False)')
+
     iblviewer = IBLViewer()
     # First retrieve command-line arguments (default ones + custom ones above)
-    args = iblviewer.parse_args()
+    args = iblviewer.parse_args(parser)
 
-    pb = ProbeData()
+    pb = ProbeData(args.segments)
     # Now start the viewer and add points when it's initialized
     iblviewer.launch(pb.on_viewer_initialized, None, args)
     '''
