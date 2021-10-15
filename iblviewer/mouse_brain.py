@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Any
 import os
 import logging
 import numpy as np
@@ -11,17 +10,17 @@ import vedo
 import nrrd
 import ibllib.atlas
 from ibllib.atlas.regions import BrainRegions
+from iblutil.numerical import ismember
 
 from iblviewer.application import Viewer
 from iblviewer.volume import VolumeController, VolumeModel, LUTModel
 import iblviewer.utils as utils
 
-
 ALLEN_ATLAS_RESOLUTIONS = [10, 25, 50, 100]
 ALLEN_ATLASES = {'base_url': 'http://download.alleninstitute.org/informatics-archive',
                 'mouse_ccf_folder': '/current-release/mouse_ccf',
-                'atlas_folder': '/annotation/ccf_2017', 'atlas_prefix': '/annotation_', 
-                'dwi_folder': '/average_template', 'dwi_prefix': '/average_template_', 
+                'atlas_folder': '/annotation/ccf_2017', 'atlas_prefix': '/annotation_',
+                'dwi_folder': '/average_template', 'dwi_prefix': '/average_template_',
                 'volume_extension': '.nrrd'}
 
 # Default origin is "bregma", an origin defined at the center of the XY axes (not on Z)
@@ -37,8 +36,8 @@ LUT_VERSION = 'v01' # version 01 is the lateralized version
 class AllenAtlasExt(ibllib.atlas.AllenAtlas):
     """
     This overwrites the constructor of AllenAtlas that is not designed to be used for the
-    public, that is people outside of IBL. Typically, you'd want to display the Allen volume 
-    data in this viewer and perform additional tasks (such as loading your own extra data) 
+    public, that is people outside of IBL. Typically, you'd want to display the Allen volume
+    data in this viewer and perform additional tasks (such as loading your own extra data)
     with other libraries. Dev note: I'm forced to copy and modify the whole constructor in this case.
 
     Instantiates an atlas.BrainAtlas corresponding to the Allen CCF at the given resolution
@@ -54,7 +53,7 @@ class AllenAtlasExt(ibllib.atlas.AllenAtlas):
             volume = np.load(str(file_volume), allow_pickle=True)['arr_0']
         return volume
 
-    def __init__(self, res_um=25, brainmap='Allen', scaling=np.array([1, 1, 1]), 
+    def __init__(self, res_um=25, brainmap='Allen', scaling=np.array([1, 1, 1]),
                 image_file_path=None, label_file_path=None):
         """
         :param res_um: 10, 25 or 50 um
@@ -80,7 +79,7 @@ class AllenAtlasExt(ibllib.atlas.AllenAtlas):
         label = self.remap_atlas(label_file_path, regions, ibregma)
 
         # This calls BrainAtlas, the mother class of AllenAtlas because we want to overwrite it
-        super(ibllib.atlas.AllenAtlas, self).__init__(image, label, dxyz, regions, 
+        super(ibllib.atlas.AllenAtlas, self).__init__(image, label, dxyz, regions,
         ibregma, dims2xyz=dims2xyz, xyz2dims=xyz2dims)
 
     def remap_atlas(self, local_file_path, regions=None, ibregma=None):
@@ -110,8 +109,6 @@ class AllenAtlasExt(ibllib.atlas.AllenAtlas):
         :param label: Segmented volume
         :return: Modified volume
         """
-        # Another dependency, that probably comes along with ibllib
-        from brainbox.numerical import ismember
         _logger.info("computing brain atlas annotations lookup table")
         if regions is None:
             regions = BrainRegions()
@@ -127,7 +124,7 @@ class AllenAtlasExt(ibllib.atlas.AllenAtlas):
         _, im = ismember(label, regions.id)
         label = np.reshape(im.astype(np.uint16), label.shape)
         return label
-        
+
 
 
 @dataclass
@@ -244,7 +241,7 @@ class IBLAtlasModel():
             #print(scalar - scalar_map[value])
             if scalar_map[value] == scalar:
                 return value
-        
+
     def get_mapped_data(self, value):
         """
         Given a value from the segmented volume, we retrieve useful info
@@ -270,7 +267,7 @@ class IBLAtlasModel():
                 scalar = scalar_map.get(value)
             else:
                 scalar = scalar_map[value]
-        return {'scalar':scalar, 'region_id':region_id, 'color':color, 'alpha':alpha, 
+        return {'scalar':scalar, 'region_id':region_id, 'color':color, 'alpha':alpha,
                 'region_name':region_name, 'region_data':region_data}
 
     def remap(self, ids, source='Allen', dest='Beryl'):
@@ -282,7 +279,6 @@ class IBLAtlasModel():
         :param dest: Destination mapping
         """
         #from ibllib.atlas import BrainRegions as br
-        from brainbox.numerical import ismember
         _, inds = ismember(ids, self.atlas.regions.mappings[source])
         return self.atlas.regions.mappings[dest][inds]
 
@@ -313,7 +309,7 @@ class IBLAtlasModel():
         """
         Load a volume data file. Supports NRRD and many other formats thanks to vedo/VTK
         :param file_path: Volume file path. Could support other file types easily.
-        :param remap_scalars: Whether scalar values in the volume are replaced by 
+        :param remap_scalars: Whether scalar values in the volume are replaced by
             their row id from a mapping that stores. This is necessary in the case of segmented
             volumes with regions that have a discontinuous id.
         :param mapping: Pandas Series or a Dictionary
@@ -333,7 +329,7 @@ class IBLAtlasModel():
         """
         Set the volume data according to a mapping
         :param volume: Given volume to display
-        :param atlas_mapping: Mapping, either a string for the name of the mapping or an integer. 
+        :param atlas_mapping: Mapping, either a string for the name of the mapping or an integer.
         :param ibl_back_end: If you are not using ibllib and want to load your own volume, set this to False
             so that there will be no transposition of the volume (needed for the ones from IBL)
         :return: Volume nd array
@@ -404,10 +400,10 @@ class MouseBrainViewer(Viewer):
         self.ibl_model = None
         # Shortcut for users
         self.ibl_transpose = IBLAtlasModel.IBL_TRANSPOSE
-        
-    def initialize(self, resolution=25, mapping='Beryl', add_atlas=True, add_dwi=False, 
+
+    def initialize(self, resolution=25, mapping='Beryl', add_atlas=True, add_dwi=False,
                     dwi_color_map='viridis', dwi_alpha_map=None, local_allen_volumes_path=None,
-                    offscreen=False, jupyter=False, embed_ui=False, embed_font_size=15, 
+                    offscreen=False, jupyter=False, embed_ui=False, embed_font_size=15,
                     plot=None, plot_window_id=0, num_windows=1, render=False, dark_mode=False):
         """
         Initialize the controller, main entry point to the viewer
@@ -430,7 +426,7 @@ class MouseBrainViewer(Viewer):
         """
         self.model.title = 'IBL Viewer'
 
-        # ibllib works with two volumes at the same time: the segmented volume (called 'label') 
+        # ibllib works with two volumes at the same time: the segmented volume (called 'label')
         # and the DWI volume (called 'image')
         self.ibl_model = IBLAtlasModel()
         self.ibl_model.initialize(resolution, local_allen_volumes_path)
@@ -459,7 +455,7 @@ class MouseBrainViewer(Viewer):
             self.load_bounding_mesh()
         except Exception:
             pass
-        
+
         #light = vedo.Light(self.model.IBL_BREGMA_ORIGIN - [0, 0, 1000], c='w', intensity=0.2)
         #self.plot.add(light)
 
@@ -480,7 +476,7 @@ class MouseBrainViewer(Viewer):
         """
         if isinstance(self.atlas_controller, VolumeController):
             return
-        self.atlas_controller = VolumeController(self.plot, self.ibl_model.atlas_volume, 
+        self.atlas_controller = VolumeController(self.plot, self.ibl_model.atlas_volume,
                                                 alpha_unit_upper_offset=0.1, center_on_edges=True)
         self.register_controller(self.atlas_controller, self.atlas_controller.get_related_actors())
 
@@ -492,10 +488,10 @@ class MouseBrainViewer(Viewer):
         """
         if isinstance(self.dwi_controller, VolumeController):
             return
-        self.dwi_controller = VolumeController(self.plot, self.ibl_model.dwi_volume, 
+        self.dwi_controller = VolumeController(self.plot, self.ibl_model.dwi_volume,
                                                 center_on_edges=True)
         self.dwi_controller.set_color_map(color_map, alpha_map)
-        self.register_controller(self.dwi_controller, self.dwi_controller.get_related_actors())    
+        self.register_controller(self.dwi_controller, self.dwi_controller.get_related_actors())
 
     def load_bounding_mesh(self, add_to_scene=False, alpha_on_scene=0.3):
         """
@@ -528,7 +524,7 @@ class MouseBrainViewer(Viewer):
         """
         return self.ibl_model.atlas.regions.name.tolist()
 
-    def _select(self, actor=None, controller=None, event=None, 
+    def _select(self, actor=None, controller=None, event=None,
                     camera_position=None, position=None, value=None):
         """
         Define the current object selected
@@ -608,7 +604,7 @@ class MouseBrainViewer(Viewer):
         return point_cloud
 
     def add_spheres(self, positions, radius=10, values=None, color_map='Accent', name='Spheres',
-                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, 
+                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True,
                     bounding_mesh=None, ibl_flip_yz=True, **kwargs):
         """
         Add new spheres
@@ -616,7 +612,7 @@ class MouseBrainViewer(Viewer):
         :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
             in case as_spheres is False.
         :param values: 1D array of values, one per neuron or a time series of such 1D arrays (numpy format)
-        :param color_map: A color map, it can be a color map built by IBLViewer or 
+        :param color_map: A color map, it can be a color map built by IBLViewer or
             a color map name (see vedo documentation), or a list of values, etc.
         :param name: All point neurons are grouped into one object, you can give it a custom name
         :param use_origin: Whether the origin is added as offset to the given positions
@@ -637,7 +633,7 @@ class MouseBrainViewer(Viewer):
         if noise_amount is not None:
             positions += np.random.rand(len(positions), 3) * noise_amount
         link = True if add_to_scene and not trim_outliers else False
-        spheres = super().add_spheres(positions, radius, values, color_map, 
+        spheres = super().add_spheres(positions, radius, values, color_map,
                                     name, use_origin, link, **kwargs)
         spheres.axes = axes
         if bounding_mesh is None:
@@ -650,7 +646,7 @@ class MouseBrainViewer(Viewer):
         return spheres
 
     def add_points(self, positions, radius=10, values=None, color_map='Accent', name='Points', screen_space=False,
-                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, bounding_mesh=None, 
+                    use_origin=True, add_to_scene=True, noise_amount=0, trim_outliers=True, bounding_mesh=None,
                     ibl_flip_yz=True, **kwargs):
         """
         Add new points
@@ -658,11 +654,11 @@ class MouseBrainViewer(Viewer):
         :param radius: List same length as positions of radii. The default size is 5um, or 5 pixels
             in case as_spheres is False.
         :param values: 1D array of values, one per neuron or a time series of such 1D arrays (numpy format)
-        :param color_map: A color map, it can be a color map built by IBLViewer or 
+        :param color_map: A color map, it can be a color map built by IBLViewer or
             a color map name (see vedo documentation), or a list of values, etc.
         :param name: All point neurons are grouped into one object, you can give it a custom name
         :param screen_space: Type of point, if True then the points are static screen-space points.
-            If False, then the points are made to scale in 3D, ie you see them larger when you 
+            If False, then the points are made to scale in 3D, ie you see them larger when you
             zoom closer to them, while this is not the case with screen-space points. Defaults to False.
         :param use_origin: Whether the origin is added as offset to the given positions
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
@@ -682,7 +678,7 @@ class MouseBrainViewer(Viewer):
         if noise_amount is not None:
             positions += np.random.rand(len(positions), 3) * noise_amount
         link = True if add_to_scene and not trim_outliers else False
-        points = super().add_points(positions, radius, values, color_map, name, 
+        points = super().add_points(positions, radius, values, color_map, name,
                                     screen_space, use_origin, link, **kwargs)
         points.axes = axes
         if bounding_mesh is None:
@@ -694,9 +690,9 @@ class MouseBrainViewer(Viewer):
                 self.plot.add(points)
         return points
 
-    def add_segments(self, points, end_points=None, line_width=2, values=None, color_map='Accent', 
-                    name='Segments', use_origin=True, add_to_scene=True, relative_end_points=False, 
-                    spherical_angles=None, radians=True, trim_outliers=True, bounding_mesh=None, 
+    def add_segments(self, points, end_points=None, line_width=2, values=None, color_map='Accent',
+                    name='Segments', use_origin=True, add_to_scene=True, relative_end_points=False,
+                    spherical_angles=None, radians=True, trim_outliers=True, bounding_mesh=None,
                     ibl_flip_yz=True):
         """
         Add a set of segments
@@ -704,14 +700,14 @@ class MouseBrainViewer(Viewer):
         :param end_points: 3D numpy array of points of length n
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
-        :param color_map: A color map, it can be a color map built by IBLViewer or 
+        :param color_map: A color map, it can be a color map built by IBLViewer or
             a color map name (see vedo documentation), or a list of values, etc.
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
         :param add_to_scene: Whether the new lines are added to scene/plot and rendered
         :param relative_end_points: Whether the given end point is relative to the start point. False by default,
             except is spherical coordinates are given
-        :param spherical_angles: 3D numpy array of spherical angle data of length n 
+        :param spherical_angles: 3D numpy array of spherical angle data of length n
             In case end_points is None, this replaces end_points by finding the relative
             coordinate to each start point with the given radius/depth, theta and phi
         :param radians: Whether the given spherical angle data is in radians or in degrees
@@ -729,8 +725,8 @@ class MouseBrainViewer(Viewer):
             if end_points is not None:
                 end_points = np.array(end_points) * axes
         pre_add = True if add_to_scene and not trim_outliers else False
-        
-        #lines = super().add_segments(points, end_points, line_width, values, color_map, name, use_origin, 
+
+        #lines = super().add_segments(points, end_points, line_width, values, color_map, name, use_origin,
                                     #pre_add, relative_end_points, spherical_angles, radians)
         '''
         Crazy python stuff here [WARNING]
@@ -764,14 +760,14 @@ class MouseBrainViewer(Viewer):
                 self.plot.add(lines)
         return lines
 
-    def add_lines(self, points, line_width=2, values=None, color_map='Accent', name='Lines', 
+    def add_lines(self, points, line_width=2, values=None, color_map='Accent', name='Lines',
                 use_origin=True, add_to_scene=True, trim_outliers=True, bounding_mesh=None, ibl_flip_yz=True):
         """
         Create a set of lines with given point sets
         :param points: List of lists of 3D coordinates
         :param line_width: Line width, defaults to 2px
         :param values: 1D list of length n, for one scalar value per line
-        :param color_map: A color map, it can be a color map built by IBLViewer or 
+        :param color_map: A color map, it can be a color map built by IBLViewer or
             a color map name (see vedo documentation), or a list of values, etc.
         :param name: Name to give to the object
         :param use_origin: Whether the current origin (not necessarily absolute 0) is used as offset
@@ -811,7 +807,7 @@ class MouseBrainViewer(Viewer):
             points = all_points
             if values is None:
                 values = indices
-        
+
         pre_add = True if add_to_scene and not trim_outliers else False
         lines = super().add_lines(points, line_width, values, color_map, name, False, pre_add)
 
@@ -827,7 +823,7 @@ class MouseBrainViewer(Viewer):
                 self.plot.add(lines)
         return lines
 
-    def add_volume(self, data=None, resolution=None, file_path=None, color_map='viridis', 
+    def add_volume(self, data=None, resolution=None, file_path=None, color_map='viridis',
                     alpha_map=None, select=False, add_to_scene=True, transpose=None):
         """
         Add a volume to the viewer with box clipping and slicing enabled by default
@@ -840,14 +836,14 @@ class MouseBrainViewer(Viewer):
             are transparent and maximum values are opaque
         :param select: Whether the volume is selected
         :param add_to_scene: Whether the volume is added to scene
-        :param transpose: Transposition parameter. If None. nothing happens. If True, 
+        :param transpose: Transposition parameter. If None. nothing happens. If True,
             then the default IBL transposition is applied. You can provide your own, that is,
             a list of 3 elements to reorder the volume as desired.
         :return: VolumeController
         """
         if transpose == True:
             transpose = self.ibl_transpose
-        return super().add_volume(data, resolution, file_path, color_map, 
+        return super().add_volume(data, resolution, file_path, color_map,
                                 alpha_map, select, add_to_scene, transpose)
 
     def set_left_view(self):

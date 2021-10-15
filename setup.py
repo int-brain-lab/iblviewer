@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 #import iblviewer.launcher
 
 setup(
-    name = 'iblviewer', 
+    name='iblviewer',
     version='2.4.6',
     description='An interactive GPU-accelerated 3D viewer based on VTK',
     url='https://github.com/int-brain-lab/iblviewer',
@@ -19,6 +19,7 @@ setup(
                       'vtk>=9.0',
                       'ipywebrtc',
                       #'ibllib>=1.6.0', # This optional dependency is huge (100MB)!
+                      'iblutil',
                       'vedo>=2021.0.3',
                       'ipyvtklink',
                       'PyQt5',
@@ -42,7 +43,7 @@ setup(
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: MIT License', 
+        'License :: OSI Approved :: MIT License',
         'Operating System :: POSIX :: Linux',
         'Operating System :: MacOS',
         'Programming Language :: Python :: 3.8',
