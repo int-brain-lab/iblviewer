@@ -20,7 +20,7 @@ setup(
                       'ipywebrtc',
                       #'ibllib>=1.6.0', # This optional dependency is huge (100MB)!
                       'iblutil',
-                      'vedo>=2021.0.3',
+                      'vedo>=2022.0.1',
                       'ipyvtklink',
                       'PyQt5',
                       'pyqt-darktheme'
