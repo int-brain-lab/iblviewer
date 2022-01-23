@@ -508,7 +508,7 @@ class Viewer():
         """
         self.model.ui.set_dark_mode(on)
         if self.plot is not None:
-            self.plot.backgroundColor(self.model.ui.background_color)
+            self.plot.background(self.model.ui.background_color)
         if self.color_bar is not None:
             self.update_element_color(self.color_bar)
         if not update_ui:
