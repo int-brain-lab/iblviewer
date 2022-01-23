@@ -9,7 +9,7 @@ The small added part related to IBL allows scientists to view their data and mod
 
 ## Installation
 ```bash
-pip install git+https://github.com/int-brain-lab/iblviewer.git
+pip install iblviewer
 ```
 
 ## Installation related to IBL
@@ -36,13 +36,13 @@ This will uninstall vtk and reinstall it (version 9+) with pip.
 ## Updating
 If you have installed IBLViewer (see below) and you to update to the latest version, run:
 ```bash
-pip install -U git+https://github.com/int-brain-lab/iblviewer.git
+pip install -U iblviewer
 ```
 
 In rare cases like observed on Windows once, updating fails and the user doesn't know about it. Reinstall iblviewer:
 ```bash
 pip uninstall iblviewer
-pip install git+https://github.com/int-brain-lab/iblviewer.git
+pip install iblviewer
 ```
 
 ## Examples
