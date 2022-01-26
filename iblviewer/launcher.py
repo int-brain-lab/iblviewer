@@ -3,10 +3,8 @@ import numpy as np
 from iblviewer.qt_application import ViewerApp
 from iblviewer.application import Viewer
 got_ibllib = True
-try:
-    from iblviewer.mouse_brain import MouseBrainViewer
-except ModuleNotFoundError:
-    got_ibllib = False
+from iblviewer.mouse_brain import MouseBrainViewer
+
 
 
 """
@@ -129,12 +127,6 @@ class IBLViewer():
             if args is None:
                 args = self.parse_args()
                 self.args = args
-
-        if args.neuroscience and not got_ibllib:
-            print(ibllib_msg)
-            exit()
-            # Fallback plan ?
-            #args.neuroscience = False
 
         if args.neuroscience:
             # This a computational neuroscience environment, in this case focused

@@ -18,7 +18,7 @@ setup(
                       'k3d',
                       'vtk>=9.0',
                       'ipywebrtc',
-                      #'ibllib>=1.6.0', # This optional dependency is huge (100MB)!
+                      'ibllib',
                       'iblutil',
                       'vedo>=2022.0.1',
                       'ipyvtklink',
