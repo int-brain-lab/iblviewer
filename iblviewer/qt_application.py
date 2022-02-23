@@ -117,8 +117,9 @@ class ViewerWindow(Qt.QMainWindow):
         # doesn't freeze when interacting with it.
         # In case you need to go further with this, look at QThread with a good summary here:
         # https://realpython.com/python-pyqt-qthread/#using-qthread-to-prevent-freezing-guis
-        thread = Thread(target=self._initialize_viewer)
-        thread.start()
+        #thread = Thread(target=self._initialize_viewer)
+        #thread.start()
+        self._initialize_viewer()
 
     def _initialize_viewer(self):
         """
@@ -304,29 +305,32 @@ class ViewerWindow(Qt.QMainWindow):
         splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
         splitter.addWidget(self.vtkWidget)
         
-        self.statistics = MplCanvas(self, 5, 4, 100, self.background_color)
-        self.statistics.setStyleSheet("background-color:transparent;")
-        self.update_statistics()
+        self.statistics = None
+        self.windows_qt_mpl_issue = sys.platform == "win32"
+        if not self.windows_qt_mpl_issue:
+            self.statistics = MplCanvas(self, 5, 4, 100, self.background_color)
+            self.statistics.setStyleSheet("background-color:transparent;")
+            self.update_statistics()
+            # Create toolbar, passing statistics as first parament, parent (self, the MainWindow) as second.
+            #toolbar = NavigationToolbar(self.statistics, self)
+            #layout = Qt.QVBoxLayout()
+            #layout.addWidget(toolbar)
+            #layout.addWidget(self.statistics)
+            #self.main_vbox.addLayout(layout)
 
-        # Create toolbar, passing statistics as first parament, parent (self, the MainWindow) as second.
-        #toolbar = NavigationToolbar(self.statistics, self)
-        #layout = Qt.QVBoxLayout()
-        #layout.addWidget(toolbar)
-        #layout.addWidget(self.statistics)
-        #self.main_vbox.addLayout(layout)
+            self.statistics_widget = Qt.QWidget()
+            self.statistics_layout = Qt.QHBoxLayout(self.statistics_widget)
+            self.statistics_layout.addWidget(self.statistics)
+            # Don't show stats initially
+            self.onToggleStatistics()
 
-        self.statistics_widget = Qt.QWidget()
-        self.statistics_layout = Qt.QHBoxLayout(self.statistics_widget)
-        self.statistics_layout.addWidget(self.statistics)
-        # Don't show stats initially
-        self.onToggleStatistics()
-
-        splitter.addWidget(self.statistics_widget)
-        #splitter.setStretchFactor(3, 1)
+            splitter.addWidget(self.statistics_widget)
+        
         self.main_layout.addWidget(splitter, 4)
         self.main_splitter = splitter
+        #splitter.setStretchFactor(3, 1)
         #splitter.setSizes([125, 150])
-
+        
         self.vtkWidget.update()
         self.show()
 
@@ -508,6 +512,8 @@ class ViewerWindow(Qt.QMainWindow):
 
     @Qt.pyqtSlot()
     def onToggleStatistics(self):
+        if self.windows_qt_mpl_issue:
+            return
         if self.statistics_visible:
             self.statistics_visible = False
             self.statistics_widget.hide()

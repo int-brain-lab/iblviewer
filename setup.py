@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='iblviewer',
-    version='2.4.6',
+    version='2.4.7',
     description='An interactive GPU-accelerated 3D viewer based on VTK',
     url='https://github.com/int-brain-lab/iblviewer',
     author='Nicolas Antille',
